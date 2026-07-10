@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- Must run inline, this early, to actually take effect — confirmed
+     via Chromium's own engineering discussion on this API: scroll
+     restoration decisions happen before the page's first layout, so
+     setting this from the main script.js file (which loads much
+     later) would be too late to reliably prevent the browser's
+     automatic restoration. This page has several independently-
+     scrolling columns rather than one single page scroll, which is
+     why the browser's built-in restoration logic can sometimes land
+     somewhere other than the top after a reload — disabling it here
+     and explicitly resetting scroll positions in script.js together
+     form the full fix. -->
+<script>
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Southern Lake Michigan Outdoors — Explore, Plan, Stay Informed.</title>
+<meta name="description" content="Interactive outdoor maps, resources, and live alerts for the Southern Lake Michigan shoreline across Illinois and Indiana.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="fontawesome/css/all.min.css">
+<link rel="stylesheet" href="styles.css?v=1783702394">
+</head>
+<body>
+
+<!-- Decorative background video: silent, looping, heavily blurred.
+     The video's own visual content carries no information (it's
+     purely ambient), so it stays out of the accessibility tree and
+     tab order — but the controls below it DO let a visitor act on
+     something real (whether ambient motion/audio is playing), so
+     those are fully keyboard-reachable and properly labeled, unlike
+     the video element itself.
+
+     No <source> here on purpose — the actual video file is lazy-
+     loaded via script.js (see initLazyBackgroundVideo) after the
+     page's real content has had a chance to load first, so this
+     decorative asset never competes with anything that matters for
+     network/bandwidth priority.
+
+     Two video elements stacked — bgVideo is the active/visible one,
+     bgVideoAlt lives behind it at opacity 0. Crossfading between
+     weather videos works by loading the new video into whichever
+     element is currently hidden, then swapping opacity. -->
+<video class="bg-video" id="bgVideo" muted loop playsinline preload="metadata" aria-hidden="true" tabindex="-1" data-src="assets/SLMO_Background_Video.mp4"></video>
+<video class="bg-video bg-video--alt" id="bgVideoAlt" muted loop playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>
+
+<!-- ============================================================
+     CONSENT BANNER — shown on first visit until the user agrees.
+     Uses localStorage (not a cookie) to remember the choice.
+     See initConsentBanner() in script.js. To remove entirely,
+     delete this element and that function call.
+     ============================================================ -->
+<div id="consentBanner" class="consent-banner" role="dialog" aria-modal="true" aria-labelledby="consentHeading" hidden>
+  <div class="consent-inner">
+    <div class="consent-content">
+      <div class="consent-heading">
+        <span class="consent-icon"><img src="assets/SLMO_Logo_Consent.png" alt="" aria-hidden="true"></span>
+        <h2 id="consentHeading">Before You Go Outside</h2>
+      </div>
+      <div class="consent-body">
+        <p>Weather and beach advisory information on this site is provided for <strong>general informational purposes only</strong> and sourced from third parties. It may be incomplete, delayed, or inaccurate — it is <strong>not a substitute for official alerts or local authorities.</strong></p>
+        <p>Southern Lake Michigan Outdoors, the University of Illinois, NOAA, Illinois-Indiana Sea Grant, and Purdue University disclaim all liability for any loss, injury, or damage resulting from its use. <strong>Always check posted beach conditions and official sources before entering the water.</strong></p>
+      </div>
+      <button type="button" id="consentAgreeBtn" class="consent-agree-btn">
+        <i class="fa-solid fa-check" aria-hidden="true"></i> I understand
+      </button>
+      <p class="consent-storage-note">
+        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+        We use your browser's local storage to remember basic settings, such as whether you've already seen this notice. This information never leaves your device.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="bg-video-controls" role="group" aria-label="Background ambiance controls">
+  <button type="button" id="bgVideoPlayToggle" class="bg-video-btn" aria-pressed="false" aria-label="Play background video">
+    <i class="fa-solid fa-play" aria-hidden="true"></i>
+  </button>
+  <button type="button" id="bgAudioPrevToggle" class="bg-video-btn bg-audio-track-btn" aria-label="Previous ambient track" hidden>
+    <i class="fa-solid fa-backward-step" aria-hidden="true"></i>
+  </button>
+  <button type="button" id="bgAudioNextToggle" class="bg-video-btn bg-audio-track-btn" aria-label="Next ambient track" hidden>
+    <i class="fa-solid fa-forward-step" aria-hidden="true"></i>
+  </button>
+  <button type="button" id="bgAudioToggle" class="bg-video-btn" aria-pressed="false" aria-label="Play ambient audio">
+    <i class="fa-solid fa-volume-xmark" aria-hidden="true"></i>
+  </button>
+  <span id="bgAudioTrackLabel" class="bg-audio-track-label" hidden aria-live="polite"></span>
+  <input type="range" id="bgVolumeSlider" class="bg-volume-slider" min="0" max="100" value="50" step="1"
+    aria-label="Ambient audio volume" hidden>
+</div>
+
+<!-- Ambient audio track player. Three real tracks loop as a playlist
+     — see AMBIENT_TRACKS in script.js for the file list, shuffle-start
+     logic, and the prev/next/auto-advance wiring (initAmbientAudio).
+     Hidden (not aria-hidden, since its CONTROLS — the buttons above —
+     need to stay meaningfully connected to it) but doesn't need its
+     own visible UI, since the toggle/skip buttons above drive it
+     entirely. -->
+<audio id="bgAmbientAudio" style="display: none;"></audio>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<div id="scaleWrapper" class="scale-wrapper">
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="." class="brand-logo-link" id="brandLogoLink" aria-label="Refresh page">
+        <img src="assets/SLMO_Logo.png" alt="Southern Lake Michigan Outdoors circular logo: a stylized sun, bluff, and shoreline above the words Southern Lake Michigan Outdoors" class="brand-logo" width="76" height="76">
+      </a>
+      <div class="brand-text">
+        <h1 class="brand-title"><span class="brand-title-line1">Southern Lake</span> <span class="brand-title-line2">Michigan Outdoors</span></h1>
+        <p class="brand-tagline">Explore, Plan, Stay Informed.</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <button type="button" id="contrastToggle" class="contrast-toggle notranslate" translate="no" aria-pressed="false" aria-label="Enable high contrast mode">
+        <i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>
+        <span class="contrast-toggle-label">High Contrast</span>
+      </button>
+      <div class="lang-select-wrap notranslate" translate="no">
+        <label for="langSelect" class="sr-only">Select language</label>
+        <select id="langSelect" class="lang-select notranslate" translate="no">
+          <option value="" selected>Select Language</option>
+          <option value="en|en">English</option>
+          <option value="en|es">Español</option>
+          <option value="en|pl">Polski</option>
+          <option value="en|zh-CN">中文</option>
+          <option value="en|tl">Filipino</option>
+          <option value="en|de">Deutsch</option>
+          <option value="en|ar">العربية</option>
+          <option value="en|vi">Tiếng Việt</option>
+          <option value="en|ko">한국어</option>
+          <option value="en|ja">日本語</option>
+        </select>
+        <i class="fa-solid fa-chevron-down lang-select-icon" aria-hidden="true"></i>
+      </div>
+      <div id="google_translate_element" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden;"></div>
+      <div class="nav-toggle-group">
+        <a class="nav-toggle" href="#resourcesNav" data-nav-target="resourcesNav">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i>
+          <span>Resources</span>
+        </a>
+        <a class="nav-toggle" href="#main-content" data-nav-target="main-content">
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+          <span>Maps</span>
+        </a>
+        <a class="nav-toggle" href="#buoy-heading" data-nav-target="buoySection">
+          <i class="fa-solid fa-water" aria-hidden="true"></i>
+          <span>Buoys</span>
+        </a>
+        <a class="nav-toggle" href="#alertsAside" data-nav-target="alertsAside">
+          <i class="fa-solid fa-bell" aria-hidden="true"></i>
+          <span>Alerts</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</header>
+
+
+<script>
+  // Bootstraps Google's own translation library directly (no
+  // third-party wrapper). Our custom <select> in the header is the
+  // only visible control; this hidden target just gives Google's
+  // element somewhere to attach to. Persistence and immediate
+  // translation are handled via the googtrans cookie in script.js —
+  // see initLanguageSelect() there for the full flow.
+  //
+  // NOTE on the GTranslate detour: briefly replaced with GTranslate's
+  // free dropdown widget (cdn.gtranslate.net/widgets/latest/dropdown.js)
+  // since Google's own widget is officially end-of-life for general
+  // use — but GTranslate's script never actually translated anything
+  // while testing via a file:// URL (opening index.html directly from
+  // disk, not through a real web server), even though this Google
+  // widget DOES still work in that same file:// setup in Firefox. The
+  // exact mechanism wasn't confirmed (GTranslate's script is minified
+  // and couldn't be fetched/inspected from this environment to verify
+  // why), but the working behavior took priority over an unconfirmed
+  // theory, so this reverts to the version that's actually known to
+  // work for now. If Chrome-specific flakiness becomes a real problem
+  // again — especially once this is served from a real domain rather
+  // than file:// — GTranslate or the Google Cloud Translation API
+  // (via a Worker, same pattern as the buoy/weather proxies) are the
+  // two real upgrade paths to revisit, ideally tested over a real
+  // http(s) origin (e.g. `python -m http.server`) rather than file://
+  // before committing to either.
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement(
+      {
+        pageLanguage: 'en',
+        includedLanguages: 'en,es,pl,zh-CN,tl,de,ar,vi,ko,ja',
+        autoDisplay: false,
+      },
+      'google_translate_element'
+    );
+  }
+</script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+<div class="page-wrapper">
+<div class="layout">
+
+  <!-- LEFT COLUMN: RESOURCES -->
+  <nav class="col col-resources" id="resourcesNav" tabindex="-1" aria-label="Resources">
+    <h2 class="col-heading"><i class="fa-solid fa-book-open" aria-hidden="true"></i> Resources</h2>
+
+    <section class="res-group" aria-labelledby="heading-boating">
+      <h3 id="heading-boating">Boating</h3>
+      <ul>
+        <li><a href="https://dnr.illinois.gov/boating/boatingopportunities.html" target="_blank" rel="noopener"><i class="fa-solid fa-ship" aria-hidden="true"></i> Illinois Boat Launch Program <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/safety/boatingsafety.html" target="_blank" rel="noopener"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Illinois Boating Education Certificate <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/cmp/illinoiscleanmarina.html" target="_blank" rel="noopener"><i class="fa-solid fa-anchor" aria-hidden="true"></i> Illinois Clean Marinas <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://experience.arcgis.com/experience/ddedef95863540ebb02fb044aa5a7e38" target="_blank" rel="noopener"><i class="fa-solid fa-person-swimming" aria-hidden="true"></i> IN DNR Where to Paddle <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/wildlife-resources/public-access-program" target="_blank" rel="noopener"><i class="fa-solid fa-ship" aria-hidden="true"></i> Indiana Boat Launches <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.boat-ed.com/indiana/" target="_blank" rel="noopener"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Indiana Boating License <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/idem/lakemichigan/indiana-clean-marinas/" target="_blank" rel="noopener"><i class="fa-solid fa-anchor" aria-hidden="true"></i> Indiana Clean Marinas <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.illinoispaddle.com/" target="_blank" rel="noopener"><i class="fa-solid fa-person-swimming" aria-hidden="true"></i> Paddle Illinois <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://surfradar.info/publ/dashboards/lake_michigan/11-1" target="_blank" rel="noopener"><i class="fa-solid fa-wind" aria-hidden="true"></i> Windsurfing &ndash; Great Lakes Surf Radar <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+      </ul>
+    </section>
+
+    <section class="res-group" aria-labelledby="heading-fishing">
+      <h3 id="heading-fishing">Fishing</h3>
+      <ul>
+        <li><a href="https://fishatlas.org/" target="_blank" rel="noopener"><i class="fa-solid fa-fish" aria-hidden="true"></i> Fish Atlas <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://ifishillinois.org/Waterbodies/LakesAndReservoirs" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Illinois Fishing <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/lpr/fishinglicensesfees.html" target="_blank" rel="noopener"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Illinois Fishing License <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/licenses-and-permits/" target="_blank" rel="noopener"><i class="fa-solid fa-id-card" aria-hidden="true"></i> Indiana Fishing License <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/fishing/where-to-fish-interactive-map" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i> Indiana Where to Fish <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+      </ul>
+    </section>
+
+    <section class="res-group" aria-labelledby="heading-parks">
+      <h3 id="heading-parks">Parks</h3>
+      <ul>
+        <li><a href="https://www.chicagoparkdistrict.com/" target="_blank" rel="noopener"><i class="fa-solid fa-tree" aria-hidden="true"></i> Chicago Park District <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.gary.gov/parks/about" target="_blank" rel="noopener"><i class="fa-solid fa-tree" aria-hidden="true"></i> Gary Parks and Recreation <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.gohammond.com/departments/parks-and-recreation/" target="_blank" rel="noopener"><i class="fa-solid fa-tree" aria-hidden="true"></i> Hammond Parks and Recreation <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.nps.gov/indu/index.htm" target="_blank" rel="noopener"><i class="fa-solid fa-mountain" aria-hidden="true"></i> Indiana Dunes National Park <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/state-parks/parks-lakes/indiana-dunes-state-park/" target="_blank" rel="noopener"><i class="fa-solid fa-mountain" aria-hidden="true"></i> Indiana Dunes State Park <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.michigancityin.gov/city-departments/parks-recreation" target="_blank" rel="noopener"><i class="fa-solid fa-tree" aria-hidden="true"></i> Michigan City Parks and Recreation <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+      </ul>
+    </section>
+
+    <section class="res-group" aria-labelledby="heading-travel">
+      <h3 id="heading-travel">Travel</h3>
+      <ul>
+        <li><a href="https://www.gettingaroundillinois.com/" target="_blank" rel="noopener"><i class="fa-solid fa-road" aria-hidden="true"></i> Illinois Travel Conditions <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/indot/travel-conditions/travel-information/" target="_blank" rel="noopener"><i class="fa-solid fa-road" aria-hidden="true"></i> Indiana Travel Conditions <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/nirpc/transportation/greenways-and-blueways/greenways-and-blueways-map/" target="_blank" rel="noopener"><i class="fa-solid fa-map" aria-hidden="true"></i> NIRPC Greenways &amp; Blueways Map <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://mysouthshoreline.com/" target="_blank" rel="noopener"><i class="fa-solid fa-train" aria-hidden="true"></i> South Shore Line <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+      </ul>
+    </section>
+
+    <section class="res-group" aria-labelledby="heading-water-safety">
+      <h3 id="heading-water-safety">Water Safety</h3>
+      <ul>
+        <li><a href="https://www.facebook.com/groups/1322458709024153/" target="_blank" rel="noopener"><i class="fa-brands fa-facebook" aria-hidden="true"></i> Blue Flow Great Lakes <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://greatlakeswatersafety.org" target="_blank" rel="noopener"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Great Lakes Water Safety Consortium <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://portal.idem.in.gov/beachalert" target="_blank" rel="noopener"><i class="fa-solid fa-bell" aria-hidden="true"></i> IDEM Beach Alert <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.idph.state.il.us/envhealth/ilbeaches/public/" target="_blank" rel="noopener"><i class="fa-solid fa-bell" aria-hidden="true"></i> Illinois Beach Guard <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.lakemichigansafety.org/" target="_blank" rel="noopener"><i class="fa-solid fa-life-ring" aria-hidden="true"></i> Lake Michigan Safety <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.facebook.com/profile.php?id=100064506169734" target="_blank" rel="noopener"><i class="fa-brands fa-facebook" aria-hidden="true"></i> Lake Michigan Safety (Facebook) <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.weather.gov/greatlakes/beachhazards" target="_blank" rel="noopener"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> NWS Great Lakes Beach Hazards <i class="fa-solid fa-arrow-up-right-from-square ext-icon" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></li>
+      </ul>
+    </section>
+  </nav>
+
+  <!-- CENTER COLUMN: INTERACTIVE OUTDOOR MAPS -->
+  <div class="col col-main-wrapper">
+    <main class="col-main" id="main-content" tabindex="-1">
+    <h2 class="col-heading"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Interactive Outdoor Maps</h2>
+
+    <div class="main-blurb-zone">
+      <figure class="main-blurb">
+        <hr class="main-blurb-rule" role="presentation">
+        <blockquote>
+          <p>Whether it's swimming, boating, hiking, fishing, or camping you're after, southern Lake Michigan is the place for you. Discover all the region has to offer with these interactive maps.</p>
+        </blockquote>
+        <hr class="main-blurb-rule" role="presentation">
+      </figure>
+    </div>
+
+    <div class="dash-grid">
+      <a class="dash-card" href="https://www.iiseagrant.org/tourism/illinois/index.html" target="_blank" rel="noopener" aria-describedby="il-card-desc">
+        <div class="dash-card-inner">
+          <div class="dash-card-media dash-card-media--il"></div>
+          <div class="dash-card-footer">
+            <div>
+              <span class="dash-card-title">Explore Illinois</span>
+              <span class="dash-card-sub" id="il-card-desc">Interactive map of Illinois' shoreline with beaches, trails, marinas, and more.<span class="sr-only"> (opens in new tab)</span></span>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          </div>
+        </div>
+      </a>
+
+      <a class="dash-card" href="https://www.iiseagrant.org/tourism/indiana/index.html" target="_blank" rel="noopener" aria-describedby="in-card-desc">
+        <div class="dash-card-inner">
+          <div class="dash-card-media dash-card-media--in"></div>
+          <div class="dash-card-footer">
+            <div>
+              <span class="dash-card-title">Explore Indiana</span>
+              <span class="dash-card-sub" id="in-card-desc">Interactive map of Indiana's shoreline with beaches, trails, marinas, and more.<span class="sr-only"> (opens in new tab)</span></span>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          </div>
+        </div>
+      </a>
+    </div>
+    </main>
+
+    <section class="buoy-section" id="buoySection" tabindex="-1" aria-labelledby="buoy-heading">
+      <h2 id="buoy-heading" class="buoy-heading"><i class="fa-solid fa-water" aria-hidden="true"></i> Lake Michigan Buoys</h2>
+      <div class="buoy-grid" id="buoyGrid">
+        <article class="buoy-card" data-station="45170" data-glos-id="47" data-name="Michigan City Buoy" data-link="https://iiseagrant.org/buoys/michigan-city-buoy/">
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/michigan-city-buoy/" target="_blank" rel="noopener">Michigan City <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <p class="buoy-card-station">Station 45170</p>
+          <div class="buoy-card-data" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading&hellip;</div>
+        </article>
+        <article class="buoy-card" data-station="45198" data-glos-id="98" data-name="Chicago Buoy" data-link="https://iiseagrant.org/buoys/chicago-pier-buoy/">
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/chicago-pier-buoy/" target="_blank" rel="noopener">Chicago <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <p class="buoy-card-station">Station 45198</p>
+          <div class="buoy-card-data" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading&hellip;</div>
+        </article>
+        <article class="buoy-card" data-station="45174" data-glos-id="57" data-name="Wilmette Buoy" data-link="https://iiseagrant.org/wilmettebuoy/" data-no-water="Thermistor chain: see site">
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/wilmettebuoy/" target="_blank" rel="noopener">Wilmette <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <p class="buoy-card-station">Station 45174</p>
+          <div class="buoy-card-data" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading&hellip;</div>
+        </article>
+        <article class="buoy-card" data-station="45186" data-name="Waukegan Buoy" data-link="https://iiseagrant.org/waukegan-buoy/">
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/waukegan-buoy/" target="_blank" rel="noopener">Waukegan <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <p class="buoy-card-station">NDBC 45186</p>
+          <div class="buoy-card-data" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading&hellip;</div>
+        </article>
+        <article class="buoy-card" data-station="45187" data-name="Winthrop Harbor Buoy" data-link="https://iiseagrant.org/winthrop-harbor-buoy/" data-no-wind="1.5m anemometer: not reliable">
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/winthrop-harbor-buoy/" target="_blank" rel="noopener">Winthrop Harbor <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <p class="buoy-card-station">NDBC 45187</p>
+          <div class="buoy-card-data" aria-live="polite"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading&hellip;</div>
+        </article>
+      </div>
+      <p class="buoy-source">Source: <a href="https://glos.org/" target="_blank" rel="noopener">Great Lakes Observing System (GLOS)<span class="sr-only"> (opens in new tab)</span></a> and <a href="https://www.ndbc.noaa.gov/" target="_blank" rel="noopener">NOAA National Data Buoy Center<span class="sr-only"> (opens in new tab)</span></a> &middot; buoys are deployed seasonally (roughly April&ndash;November) and may show no data outside that window<span id="buoyTimestamp"></span></p>
+    </section>
+  </div>
+
+  <!-- RIGHT COLUMN: ALERTS -->
+  <aside class="col col-alerts" id="alertsAside" tabindex="-1" aria-label="Alerts and advisories">
+    <h2 class="col-heading"><i class="fa-solid fa-bell" aria-hidden="true"></i> Alerts &amp; Advisories</h2>
+
+    <!-- Weather card: flippable between Southern Lake Michigan
+         (approximate, front) and Local Weather (back). The
+         checkbox+CSS transform pattern from the card-flip example
+         keeps this purely declarative — no JS needed to animate
+         the flip itself, only to trigger the video/audio change
+         when the flip state changes. -->
+    <div class="weather-card-container" id="weatherCardContainer">
+      <section class="weather-card" id="weatherCard" aria-labelledby="heading-weather">
+        <!-- FRONT: Southern Lake Michigan (approximate) -->
+        <div class="weather-card-face weather-card-face--front">
+          <div class="weather-card-face-inner">
+            <h3 id="heading-weather">Lake Michigan Weather <button type="button" class="weather-info-btn" aria-label="About this forecast" title="This forecast uses a fixed NWS grid point (41.85°N, 87.65°W) to represent general conditions along the southern Lake Michigan shoreline. Actual conditions at any specific beach may differ due to lake breezes, fog, or local terrain."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button></h3>
+            <p class="weather-provider">Live conditions via <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></p>
+            <div id="weatherContentSlmo" aria-live="polite">
+              <p class="weather-status">
+                <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
+                Loading conditions for your area&hellip;
+              </p>
+            </div>
+          </div>
+          <button type="button" class="weather-card-flip-btn" id="weatherFlipToLocal" aria-label="Show local weather">
+            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+            <span>Local</span>
+          </button>
+        </div>
+        <!-- BACK: Local Weather (user's detected location) -->
+        <div class="weather-card-face weather-card-face--back">
+          <div class="weather-card-face-inner">
+            <h3 id="heading-weather-local">Local Weather</h3>
+            <p class="weather-provider">Live conditions via <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></p>
+            <div id="weatherContentLocal" aria-live="polite">
+              <p class="weather-status">
+                <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
+                Loading your local conditions&hellip;
+              </p>
+            </div>
+          </div>
+          <button type="button" class="weather-card-flip-btn" id="weatherFlipToSlmo" aria-label="Show Southern Lake Michigan weather">
+            <i class="fa-solid fa-water" aria-hidden="true"></i>
+            <span>Lake</span>
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="beach-search">
+      <label for="beachSearchInput" class="beach-search-label">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        Search Illinois &amp; Indiana beaches
+      </label>
+      <input type="search" id="beachSearchInput" class="beach-search-input" placeholder="Find a beach by name&hellip;" autocomplete="off">
+      <p id="beachSearchStatus" class="sr-only" aria-live="polite"></p>
+    </div>
+
+    <section class="beachguard-card" aria-labelledby="heading-il-beachguard">
+      <div class="beachguard-head">
+        <h3 id="heading-il-beachguard"><a href="https://idph.illinois.gov/envhealth/ilbeaches/public/" target="_blank" rel="noopener">Illinois Beachguard <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+      </div>
+      <ul class="beach-list" id="ilBeachList" aria-live="polite">
+        <li class="beach-status-row">
+          <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Checking live advisories&hellip;
+        </li>
+      </ul>
+      <p class="beach-source">Source: <a href="https://idph.illinois.gov/envhealth/ilbeaches/public/RssFeed.aspx" target="_blank" rel="noopener">IDPH Beach Advisory RSS<span class="sr-only"> (opens in new tab)</span></a><span id="ilFeedTimestamp"></span></p>
+    </section>
+
+    <section class="beachguard-card" aria-labelledby="heading-in-beachguard">
+      <div class="beachguard-head">
+        <h3 id="heading-in-beachguard"><a href="https://portal.idem.in.gov/BeachAlert/" target="_blank" rel="noopener">Indiana BeachAlert (IDEM) <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a></h3>
+      </div>
+      <ul class="beach-list" id="inBeachList"></ul>
+      <p class="beach-source">IDEM's BeachAlert can't be read. Please <a href="https://portal.idem.in.gov/BeachAlert/" target="_blank" rel="noopener">visit the IDEM portal<span class="sr-only"> (opens in new tab)</span></a>.</p>
+    </section>
+  </aside>
+
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-partners">
+        <div class="partner-logos-wrap partner-logos-wrap--left">
+          <div class="partner-logos-slice partner-logos-slice--left" role="img" aria-label=""></div>
+          <a href="https://extension.illinois.edu/" target="_blank" rel="noopener" class="partner-logo-link partner-logo-link--illinois"><span class="sr-only">University of Illinois Extension (opens in new tab)</span></a>
+          <a href="https://www.noaa.gov/" target="_blank" rel="noopener" class="partner-logo-link partner-logo-link--noaa"><span class="sr-only">NOAA — National Oceanic and Atmospheric Administration (opens in new tab)</span></a>
+          <a href="https://iiseagrant.org/" target="_blank" rel="noopener" class="partner-logo-link partner-logo-link--seagrant"><span class="sr-only">Illinois-Indiana Sea Grant (opens in new tab)</span></a>
+        </div>
+        <div class="partner-logos-wrap partner-logos-wrap--right">
+          <div class="partner-logos-slice partner-logos-slice--right" role="img" aria-label=""></div>
+          <a href="https://www.purdue.edu/" target="_blank" rel="noopener" class="partner-logo-link partner-logo-link--purdue-slice"><span class="sr-only">Purdue University (opens in new tab)</span></a>
+        </div>
+      </div>
+      <div class="footer-divider" aria-hidden="true"></div>
+      <div class="footer-contact">
+        <p>Illinois-Indiana Sea Grant, Purdue University<br>195 Marsteller Street, West Lafayette, IN 47907-2033</p>
+        <p>Phone: 765-496-6009 &middot; Email: <a href="mailto:iisg@purdue.edu?subject=Southern%20Lake%20Michigan%20Outdoors%20%E2%80%94%20Website%20Feedback">iisg@purdue.edu</a></p>
+      </div>
+    </div>
+    <p class="footer-disclaimer">Weather and beach advisory information is provided for general informational purposes only and is sourced from third parties. It may be incomplete, delayed, or inaccurate and is not a substitute for official alerts or local authorities. Southern Lake Michigan Outdoors, the University of Illinois, NOAA, Illinois-Indiana Sea Grant, and Purdue University make no warranties regarding this information and disclaim all liability for any loss, injury, or damage resulting from its use. Always check posted beach conditions, lifeguards, and official sources before entering the water.</p>
+    <p class="footer-copy">&copy; <span id="copyrightYear">2026</span> Illinois-Indiana Sea Grant, All Rights Reserved.</p>
+  </div>
+</footer>
+</div>
+</div>
+
+<!-- ============================================================
+     DEV TESTING PANEL — weather override buttons for testing video
+     and audio switching. REMOVE BEFORE PRODUCTION by deleting this
+     element and the initDevWeatherPanel() call in script.js. All
+     dev-panel logic is isolated inside that single function.
+     ============================================================ -->
+<div id="devWeatherPanel">
+  <div id="devDeadLinksPanel"></div>
+</div>
+
+<!-- track_04 is loaded via JS (initAmbientAudio) same as 01-03;
+     this element is the shared audio player, reused across all tracks. -->
+
+<script src="script.js?v=1783702394"></script>
+</body>
+</html>
