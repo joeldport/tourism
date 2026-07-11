@@ -1,3 +1,31 @@
+// ===================================================================
+// TABLE OF CONTENTS — search for the ALL-CAPS heading text below to
+// jump to a section (line numbers aren't listed here since they drift
+// as the file changes; the heading text doesn't). Sections run in the
+// order they execute/appear, not grouped by topic.
+//
+//   KEYBOARD-VS-MOUSE DETECTION ... input-method tracking (isKeyboardNav)
+//   LANGUAGE SELECTOR .............. Google Translate integration
+//   CONSENT BANNER .................. first-visit full-screen modal
+//   HIGH CONTRAST MODE .............. data-high-contrast="on" toggle
+//   WEATHER CATEGORY NORMALIZATION .. NWS forecast text -> category
+//   BACKGROUND VIDEO ................ lazy-loaded, weather-aware
+//   BACKGROUND VIDEO/AUDIO CONTROLS . persistent play/pause control bar
+//   AMBIENT AUDIO TRACKS ............ looping background music system
+//   VERTICAL FIT SCALE .............. font-size scaling to avoid scroll
+//   LIVE WEATHER ..................... geolocation -> NWS grid point
+//   NWS WEATHER ...................... forecast fetch + rendering
+//   ILLINOIS BEACHGUARD .............. IL beach advisory RSS feed
+//   INDIANA BEACHALERT (IDEM) ........ IN beach advisory data
+//   BEACH SEARCH ...................... filters both beach lists
+//   LAKE MICHIGAN BUOYS .............. NDBC + GLOS buoy data (2-phase)
+//   DEV TESTING PANEL ................ F1 weather-override panel (hidden by default, ships to prod)
+//   RESOURCE LINK HEALTH CHECKER ..... periodic dead-link detection
+//   RESOURCES ACCORDION .............. responsive auto-expand/collapse
+//   PERIODIC DATA REFRESH ............ the 15-min refresh loop that
+//                                       ties weather/buoys/beaches together
+// ===================================================================
+
 // Diagnostic: surfaces any uncaught error loudly in the console,
 // including its source file/line, so a failure earlier in this file
 // (or in a third-party script loaded on the page) can't silently
@@ -6,6 +34,34 @@ window.addEventListener('error', (e) => {
   console.error('[page error]', e.message, 'at', e.filename + ':' + e.lineno, e.error);
 });
 console.log('%c[script.js] loaded and running — version v95', 'background:#13294B;color:#fff;font-size:14px;padding:4px 8px;');
+
+// ===================================================================
+// KEYBOARD-VS-MOUSE DETECTION — tracks which input method drove the
+// most recent focus change, the same "what-input"-style pattern most
+// focus-visible polyfills use: any Tab keydown flips it to keyboard,
+// any mousedown flips it back. Exposed as isKeyboardNav() for any
+// feature (currently just the resources accordion) that needs to
+// treat keyboard-driven focus differently from a mouse click.
+// ===================================================================
+let _slmoKeyboardNav = false;
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') _slmoKeyboardNav = true;
+}, true);
+window.addEventListener('mousedown', () => {
+  _slmoKeyboardNav = false;
+}, true);
+function isKeyboardNav() {
+  return _slmoKeyboardNav;
+}
+
+// Icons are inline SVG referencing <symbol> definitions in the sprite
+// sheet near the top of <body> (see index.html) — not Font Awesome
+// icon-font classes anymore, so every icon comes from this one helper
+// rather than repeating the same three lines of markup everywhere.
+function iconHtml(name, extraClass) {
+  const cls = extraClass ? `icon ${extraClass}` : 'icon';
+  return `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#i-${name}" xlink:href="#i-${name}"></use></svg>`;
+}
 
 // ===================================================================
 // LANGUAGE SELECTOR — GTranslate-like experience built directly on
@@ -75,18 +131,21 @@ function deleteCookie(name) {
 // specifically, even though it works consistently on normal text —
 // so this is a defensive backstop, not a redundant belt-and-suspenders
 // for its own sake.
+// Each label pairs the English name with the language's own native
+// name (e.g. "Korean - 한국어") so a visitor can identify a language
+// they don't already read, not just one whose script they recognize.
 const LANG_OPTION_LABELS = {
   '': 'Select Language',
   'en|en': 'English',
-  'en|es': 'Español',
-  'en|pl': 'Polski',
-  'en|zh-CN': '中文',
+  'en|es': 'Spanish - Español',
+  'en|pl': 'Polish - Polski',
+  'en|zh-CN': 'Chinese - 中文',
   'en|tl': 'Filipino',
-  'en|de': 'Deutsch',
-  'en|ar': 'العربية',
-  'en|vi': 'Tiếng Việt',
-  'en|ko': '한국어',
-  'en|ja': '日本語',
+  'en|de': 'German - Deutsch',
+  'en|ar': 'Arabic - العربية',
+  'en|vi': 'Vietnamese - Tiếng Việt',
+  'en|ko': 'Korean - 한국어',
+  'en|ja': 'Japanese - 日本語',
 };
 
 function restoreLanguageOptionLabels() {
@@ -104,11 +163,34 @@ function initLanguageSelect() {
   const select = document.getElementById('langSelect');
   if (!select) return;
 
+  // A plain <select> should open its dropdown on Enter/Space with zero
+  // extra code — reported not happening for some screen reader users,
+  // and this appearance:none-styled select is exactly the kind of
+  // element where that can go wrong in some browser/AT combinations.
+  // showPicker() is the modern, explicit way to open it programmatically;
+  // feature-detected so this is a no-op wherever native behavior was
+  // already working (nothing here can make things worse, only better).
+  if (typeof select.showPicker === 'function') {
+    select.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        try { select.showPicker(); } catch { /* e.g. not called from a user gesture — ignore */ }
+      }
+    });
+  }
+
   // Reflect the currently-saved language in the select on every load,
   // so the control is never out of sync with what's actually applied.
   const saved = getCookie(GOOGTRANS_COOKIE); // looks like "/en/es" or null
   const currentLangIsEnglish = !saved || saved.split('/')[2] === 'en';
   document.documentElement.classList.toggle('lang-is-english', currentLangIsEnglish);
+  // Filipino's translated nav-toggle labels ("Mga Mapa", "Mga Boya", etc.)
+  // run noticeably longer than the English originals, which is what
+  // overflows the 4-buttons-in-a-row mobile layout — this class lets
+  // CSS shrink/hide the icons in that one case to make room (see
+  // .nav-toggle i rules in styles.css).
+  const currentLangIsFilipino = !!saved && saved.split('/')[2] === 'tl';
+  document.documentElement.classList.toggle('lang-is-filipino', currentLangIsFilipino);
   if (saved) {
     const targetLang = saved.split('/')[2]; // "/en/es" -> "es"
     if (targetLang && targetLang !== 'en') {
@@ -174,6 +256,56 @@ function initLanguageSelect() {
 // initConsentBanner() call below, and the #consentBanner element
 // in index.html. Nothing else depends on this.
 // ===================================================================
+// ===================================================================
+// SCROLL LOCK — prevents the page from scrolling behind a fixed-
+// position overlay (currently just the consent banner) while it's
+// open. On desktop this is close to a no-op — body is already
+// overflow:hidden/height:100vh by default there — but the mobile/
+// reflow breakpoint deliberately RELEASES that lock (overflow:
+// visible, so the page can scroll normally in the stacked single-
+// column mobile layout), and nothing was re-locking it specifically
+// while a modal sat on top. Plain overflow:hidden on body alone is
+// well-documented as unreliable for this on iOS Safari specifically
+// — touch drags can still move the page underneath a fixed overlay
+// even with it set — so this pins body in place with position:fixed
+// and a negative top offset instead, the standard robust technique,
+// then restores the exact scroll position on unlock.
+//
+// Declared here, before initConsentBanner (which calls lockBodyScroll
+// synchronously, as soon as it runs, for a first-time visitor) — NOT
+// after it, which is where this used to live. That was a real bug:
+// lockBodyScroll/unlockBodyScroll are hoisted function declarations,
+// so they were always callable regardless of position, but the
+// `_scrollLockY` variable they both use is `let`, which is NOT fully
+// hoisted — it sits in a temporal dead zone until its own declaration
+// line actually executes. With the declaration positioned after
+// initConsentBanner's call, invoking lockBodyScroll() from inside it
+// threw "Cannot access '_scrollLockY' before initialization" —
+// synchronously, right after the banner was shown and focused but
+// before the function reached the line that attaches the "I
+// understand" button's click listener. The banner opened correctly;
+// clicking the button did nothing, because that listener was never
+// actually registered.
+// ===================================================================
+let _scrollLockY = 0;
+function lockBodyScroll() {
+  _scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+  // A custom property, not a direct style.top assignment — body
+  // already carries `top: 0 !important` (see that rule's own comment,
+  // for a reason unrelated to this) which would silently override a
+  // plain inline style.top from here. The matching CSS rule below
+  // uses this custom property inside its own !important + more-
+  // specific `body.scroll-locked` selector instead, which correctly
+  // outranks the plain `body` rule's !important.
+  document.body.style.setProperty('--scroll-lock-offset', `-${_scrollLockY}px`);
+  document.body.classList.add('scroll-locked');
+}
+function unlockBodyScroll() {
+  document.body.classList.remove('scroll-locked');
+  document.body.style.removeProperty('--scroll-lock-offset');
+  window.scrollTo(0, _scrollLockY);
+}
+
 function initConsentBanner() {
   const CONSENT_KEY = 'slmo-consent-v1';
   const banner = document.getElementById('consentBanner');
@@ -191,6 +323,7 @@ function initConsentBanner() {
   // Show the banner and trap focus inside it
   banner.hidden = false;
   agreeBtn.focus();
+  lockBodyScroll();
 
   // Prevent Tab from leaving the banner while it's open
   banner.addEventListener('keydown', (e) => {
@@ -203,6 +336,7 @@ function initConsentBanner() {
   agreeBtn.addEventListener('click', () => {
     try { localStorage.setItem(CONSENT_KEY, 'agreed'); } catch { /* blocked */ }
     banner.hidden = true;
+    unlockBodyScroll();
   });
 }
 
@@ -247,6 +381,12 @@ function initHighContrast() {
 
 initHighContrast();
 
+// Shared by initBgVideoPlayToggle and initLazyBackgroundVideo — a
+// returning visitor's own choice to turn the ambient video ON is
+// remembered the same way high-contrast mode is (see initHighContrast
+// above); a first-time visitor still always lands paused.
+const BG_VIDEO_PLAY_KEY = 'slmo-bg-video-playing';
+
 initLanguageSelect();
 
 // Logo acts as a "refresh the page" shortcut — moved here from an
@@ -264,12 +404,12 @@ if (brandLogoLink) {
 // ===================================================================
 // WEATHER CATEGORY NORMALIZATION — single source of truth used by
 // both the background video and background music systems. Maps NWS
-// shortForecast text to one of 9 named categories. Priority order
-// matches the spec (most severe first) so compound forecasts like
-// "Chance Showers and Thunderstorms" resolve to the highest priority.
+// shortForecast text to one of 9 named categories (thunderstorm,
+// winter, heavy-rain, light-rain, fog, windy, overcast, partly-cloudy,
+// sunny). Priority order below matches the spec (most severe first)
+// so compound forecasts like "Chance Showers and Thunderstorms"
+// resolve to the highest priority.
 // ===================================================================
-const WEATHER_CATEGORIES = ['thunderstorm','winter','heavy-rain','light-rain','fog','windy','overcast','partly-cloudy','sunny'];
-
 function normalizeWeatherCategory(shortForecast) {
   const t = (shortForecast || '').toLowerCase();
   if (t.includes('thunderstorm') || t.includes('t-storm'))                              return 'thunderstorm';
@@ -321,7 +461,6 @@ const bgVideoState = {
 
 function initLazyBackgroundVideo() {
   const videoA = document.getElementById('bgVideo');
-  const videoB = document.getElementById('bgVideoAlt');
   if (!videoA) return;
 
   function loadAndPlay() {
@@ -339,6 +478,16 @@ function initLazyBackgroundVideo() {
     // Seek to first frame once metadata is available, then stay paused.
     videoA.addEventListener('loadedmetadata', () => {
       videoA.currentTime = 0;
+      // Exception to "stay paused": if this visitor previously chose
+      // to turn the video ON themselves (see initBgVideoPlayToggle),
+      // honor that returning choice the same way high-contrast mode
+      // is remembered. First-time visitors still always land paused —
+      // this only fires for a preference the visitor set explicitly.
+      let savedPlaying = 'off';
+      try { savedPlaying = localStorage.getItem(BG_VIDEO_PLAY_KEY) || 'off'; } catch { /* blocked */ }
+      if (savedPlaying === 'on' && window.__slmoSetVideoPlaying) {
+        window.__slmoSetVideoPlaying(true);
+      }
     }, { once: true });
     // Do NOT call play() — video starts paused by default.
   }
@@ -517,12 +666,16 @@ function initBgVideoPlayToggle() {
   if (videoB) attachLoopListener(videoB);
 
   button.addEventListener('click', () => {
+    setVideoPlaying(activeVideo().paused);
+  });
+
+  function setVideoPlaying(shouldPlay) {
     const ambientAudio = window.__slmoAmbientAudio;
-    if (activeVideo().paused) {
+    if (shouldPlay) {
       playBoth();
       button.setAttribute('aria-pressed', 'true');
       button.setAttribute('aria-label', 'Pause background video');
-      button.innerHTML = '<i class="fa-solid fa-pause" aria-hidden="true"></i>';
+      button.innerHTML = iconHtml('pause');
       if (ambientAudio && pausedAudioOnVideoPause) {
         ambientAudio.play();
         pausedAudioOnVideoPause = false;
@@ -531,13 +684,18 @@ function initBgVideoPlayToggle() {
       pauseBoth();
       button.setAttribute('aria-pressed', 'false');
       button.setAttribute('aria-label', 'Play background video');
-      button.innerHTML = '<i class="fa-solid fa-play" aria-hidden="true"></i>';
+      button.innerHTML = iconHtml('play');
       if (ambientAudio && ambientAudio.isPlaying()) {
         ambientAudio.pause();
         pausedAudioOnVideoPause = true;
       }
     }
-  });
+    try { localStorage.setItem(BG_VIDEO_PLAY_KEY, shouldPlay ? 'on' : 'off'); } catch { /* blocked */ }
+  }
+
+  // Called from initLazyBackgroundVideo once the video is actually
+  // loaded, if this visitor previously chose to leave it playing.
+  window.__slmoSetVideoPlaying = setVideoPlaying;
 }
 
 initBgVideoPlayToggle();
@@ -553,10 +711,10 @@ initBgVideoPlayToggle();
 // track to end.
 // ===================================================================
 const AMBIENT_TRACKS = [
-  'assets/track_01.wav',
-  'assets/track_02.wav',
-  'assets/track_03.wav',
-  'assets/track_04.wav',
+  'assets/track_01.mp3',
+  'assets/track_02.mp3',
+  'assets/track_03.mp3',
+  'assets/track_04.mp3',
 ];
 
 // track_02 and track_03 each have ~1 second of dead silence at the very
@@ -712,7 +870,7 @@ function initAmbientAudio() {
     });
     button.setAttribute('aria-pressed', 'true');
     button.setAttribute('aria-label', 'Pause ambient audio');
-    button.innerHTML = '<i class="fa-solid fa-volume-high" aria-hidden="true"></i>';
+    button.innerHTML = iconHtml('volume-high');
     if (volumeSlider) volumeSlider.hidden = false;
     if (prevButton) prevButton.hidden = false;
     if (nextButton) nextButton.hidden = false;
@@ -724,7 +882,7 @@ function initAmbientAudio() {
     audioEl.pause();
     button.setAttribute('aria-pressed', 'false');
     button.setAttribute('aria-label', 'Play ambient audio');
-    button.innerHTML = '<i class="fa-solid fa-volume-xmark" aria-hidden="true"></i>';
+    button.innerHTML = iconHtml('volume-xmark');
     if (volumeSlider) volumeSlider.hidden = true;
     if (prevButton) prevButton.hidden = true;
     if (nextButton) nextButton.hidden = true;
@@ -1036,14 +1194,14 @@ function describeNwsForecast(shortForecast, isDaytime) {
   if (text.includes('snow') || text.includes('flurries') || text.includes('blizzard')) return { label: shortForecast, icon: 'fa-snowflake' };
   if (text.includes('freezing rain') || text.includes('sleet') || text.includes('ice')) return { label: shortForecast, icon: 'fa-cloud-rain' };
   if (text.includes('heavy rain') || text.includes('showers')) return { label: shortForecast, icon: 'fa-cloud-showers-heavy' };
-  if (text.includes('drizzle')) return { label: shortForecast, icon: 'fa-cloud-drizzle' };
+  if (text.includes('drizzle')) return { label: shortForecast, icon: 'fa-cloud-rain' };
   if (text.includes('rain')) return { label: shortForecast, icon: 'fa-cloud-rain' };
-  if (text.includes('fog') || text.includes('haze')) return { label: shortForecast, icon: 'fa-cloud-fog' };
-  if (text.includes('overcast')) return { label: shortForecast, icon: 'fa-clouds' };
+  if (text.includes('fog') || text.includes('haze')) return { label: shortForecast, icon: 'fa-smog' };
+  if (text.includes('overcast')) return { label: shortForecast, icon: 'fa-cloud' };
   if (text.includes('mostly cloudy') || text.includes('cloudy')) return { label: shortForecast, icon: day ? 'fa-cloud-sun' : 'fa-cloud-moon' };
   if (text.includes('partly') || text.includes('few clouds')) return { label: shortForecast, icon: day ? 'fa-cloud-sun' : 'fa-cloud-moon' };
   if (text.includes('clear') || text.includes('sunny')) return { label: shortForecast, icon };
-  return { label: shortForecast || 'Conditions Unavailable', icon: 'fa-cloud-question' };
+  return { label: shortForecast || 'Conditions Unavailable', icon: 'fa-circle-question' };
 }
 
 // ===================================================================
@@ -1115,7 +1273,7 @@ function renderWeather({ placeLabel, period }, containerId) {
 
   container.innerHTML = `
     <div class="weather-main">
-      <i class="fa-solid ${icon} weather-icon" aria-hidden="true"></i>
+      ${iconHtml(icon.replace(/^fa-/, ''), 'weather-icon')}
       <div class="weather-temp-block">
         <span class="weather-temp">${temp}<span class="weather-unit">°${period.temperatureUnit || 'F'}</span></span>
         <span class="weather-cond">${label}</span>
@@ -1146,11 +1304,11 @@ function applyActiveWeather() {
 }
 
 function renderWeatherError(message) {
-  const container = document.getElementById('weatherContentSlmo') || document.getElementById('weatherContent');
+  const container = document.getElementById('weatherContentSlmo');
   if (!container) return;
   container.innerHTML = `
-    <p class="weather-error"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> ${message}</p>
-    <a href="https://www.weather.gov/" target="_blank" rel="noopener" class="weather-link">Check weather.gov directly <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only"> (opens in new tab)</span></a>
+    <p class="weather-error">${iconHtml('triangle-exclamation')} ${message}</p>
+    <a href="https://www.weather.gov/" target="_blank" rel="noopener" class="weather-link">Check weather.gov directly ${iconHtml('arrow-up-right-from-square')}<span class="sr-only"> (opens in new tab)</span></a>
   `;
 }
 
@@ -1212,7 +1370,7 @@ async function initWeather() {
     console.error('[weather] local fetch failed:', localResult.reason);
     const localContainer = document.getElementById('weatherContentLocal');
     if (localContainer) {
-      localContainer.innerHTML = `<p class="weather-error"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Couldn\u2019t load local weather.</p>`;
+      localContainer.innerHTML = `<p class="weather-error">${iconHtml('triangle-exclamation')} Couldn\u2019t load local weather.</p>`;
     }
   }
 
@@ -1224,10 +1382,31 @@ async function initWeather() {
   const card = document.getElementById('weatherCard');
   const flipToLocal = document.getElementById('weatherFlipToLocal');
   const flipToSlmo = document.getElementById('weatherFlipToSlmo');
+  const frontFace = card ? card.querySelector('.weather-card-face--front') : null;
+  const backFace = card ? card.querySelector('.weather-card-face--back') : null;
+
+  // The face that's opacity:0 / pointer-events:none is still in the
+  // DOM (for the crossfade), so its links/buttons stay reachable by
+  // Tab even though they're invisible — a keyboard-only navigation
+  // trap. `inert` removes a subtree from the tab order (and from
+  // screen reader / find-in-page reach) while it's not the visible
+  // side, in addition to CSS already hiding it visually.
+  function syncFaceInertness(side) {
+    if (!frontFace || !backFace) return;
+    if (side === 'local') {
+      frontFace.setAttribute('inert', '');
+      backFace.removeAttribute('inert');
+    } else {
+      backFace.setAttribute('inert', '');
+      frontFace.removeAttribute('inert');
+    }
+  }
+  syncFaceInertness('slmo'); // front face is visible by default on load
 
   function setFlipSide(side) {
     weatherState.activeSide = side;
     if (card) card.classList.toggle('weather-card--flipped', side === 'local');
+    syncFaceInertness(side);
     applyActiveWeather();
   }
 
@@ -1448,7 +1627,7 @@ function renderAccordionBeachList(listEl, primary, secondary, idPrefix, emptyMes
     ${primaryHtml}
     <li class="beach-accordion-toggle-row">
       <button type="button" class="beach-accordion-toggle" id="${toggleId}" aria-expanded="false" aria-controls="${panelId}">
-        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        ${iconHtml('chevron-down')}
         Show ${secondary.length} more
       </button>
     </li>
@@ -1478,11 +1657,11 @@ function renderAccordionBeachList(listEl, primary, secondary, idPrefix, emptyMes
       if (isOpen) {
         panel.setAttribute('hidden', '');
         toggle.setAttribute('aria-expanded', 'false');
-        toggle.innerHTML = `<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Show ${secondary.length} more`;
+        toggle.innerHTML = `${iconHtml('chevron-down')} Show ${secondary.length} more`;
       } else {
         panel.removeAttribute('hidden');
         toggle.setAttribute('aria-expanded', 'true');
-        toggle.innerHTML = `<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Show fewer`;
+        toggle.innerHTML = `${iconHtml('chevron-up')} Show fewer`;
       }
     });
   } else {
@@ -1584,7 +1763,7 @@ async function initIlBeachguard() {
       const items = parseIdphRss(xmlText);
       renderIlBeachList(items);
       return; // success, stop here
-    } catch (err) {
+    } catch {
       // try the next URL in the list, if any
     }
   }
@@ -1751,7 +1930,7 @@ function initBeachSearch() {
         if (!toggle) return;
         const fullCount = panel.querySelectorAll('li').length;
         toggle.setAttribute('aria-expanded', 'false');
-        toggle.innerHTML = `<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Show ${fullCount} more`;
+        toggle.innerHTML = `${iconHtml('chevron-down')} Show ${fullCount} more`;
       });
     }
   }
@@ -1932,6 +2111,14 @@ function parseGlosErddapCsv(text) {
     WTMP: kelvinToCelsius(record.sea_surface_temperature),
     ATMP: kelvinToCelsius(record.air_temperature),
     WSPD: record.wind_speed,
+    // BUG FIX: this was previously omitted from the returned object
+    // even though `record.time` was already parsed correctly above
+    // (it's how the "latest row" was picked in the first place).
+    // getDataAge() reads this field for source==='glos' specifically —
+    // without it, every genuine GLOS reading rendered with no
+    // observation timestamp at all, which is exactly what looked like
+    // a red flag even though the underlying data was real.
+    time: record.time,
   };
 }
 
@@ -2005,6 +2192,34 @@ function formatBuoyField(rawValue, convertFn, unitSuffix, decimals = 0) {
 // card) — shown as a small label so it's visible at a glance whether
 // the preferred GLOS source is actually working, rather than only
 // discoverable by opening dev tools.
+// Parses a record's observation time into a real Date, regardless of
+// which source it came from — shared by getDataAge() (the visitor-
+// facing "X min ago" label) and the GLOS-vs-NDBC freshness guard in
+// initBuoyCards() (which needs a raw, comparable timestamp rather
+// than a rounded human label).
+function getObservedAt(record, source) {
+  if (source === 'glos' && record.time) {
+    // GLOS ERDDAP: `time` column is already an ISO string (UTC)
+    // e.g. "2026-06-18T01:50:00Z"
+    const d = new Date(record.time);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (record.YY && record.MM && record.DD && record.hh && record.mm) {
+    // NDBC realtime2 format: separate year/month/day/hour/minute
+    // columns, always UTC. Construct manually to avoid any timezone
+    // ambiguity that Date.parse() of a local string could introduce.
+    const d = new Date(Date.UTC(
+      parseInt(record.YY, 10),
+      parseInt(record.MM, 10) - 1, // months are 0-indexed in JS
+      parseInt(record.DD, 10),
+      parseInt(record.hh, 10),
+      parseInt(record.mm, 10)
+    ));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
 // How old is this data reading? Returns a short human-readable string
 // ("10 min ago", "3 hours ago", "5 days ago") plus a freshness class
 // for color-coding. Buoys report roughly hourly, so anything under 2
@@ -2012,26 +2227,8 @@ function formatBuoyField(rawValue, convertFn, unitSuffix, decimals = 0) {
 // anything over 24 hours is the safety-critical case — old data that
 // a visitor might mistakenly treat as today's conditions.
 function getDataAge(record, source) {
-  let observedAt;
-
-  if (source === 'glos' && record.time) {
-    // GLOS ERDDAP: `time` column is already an ISO string (UTC)
-    // e.g. "2026-06-18T01:50:00Z"
-    observedAt = new Date(record.time);
-  } else if (record.YY && record.MM && record.DD && record.hh && record.mm) {
-    // NDBC realtime2 format: separate year/month/day/hour/minute
-    // columns, always UTC. Construct manually to avoid any timezone
-    // ambiguity that Date.parse() of a local string could introduce.
-    observedAt = new Date(Date.UTC(
-      parseInt(record.YY, 10),
-      parseInt(record.MM, 10) - 1, // months are 0-indexed in JS
-      parseInt(record.DD, 10),
-      parseInt(record.hh, 10),
-      parseInt(record.mm, 10)
-    ));
-  }
-
-  if (!observedAt || isNaN(observedAt.getTime())) return null;
+  const observedAt = getObservedAt(record, source);
+  if (!observedAt) return null;
 
   const ageMs = Date.now() - observedAt.getTime();
   const ageMin = Math.round(ageMs / 60_000);
@@ -2070,13 +2267,33 @@ function renderBuoyCard(card, record, source) {
   const airTemp = formatBuoyField(record.ATMP, celsiusToFahrenheit, '°F', 1);
   const windSpeed = formatBuoyField(record.WSPD, msToMph, ' mph');
 
-  // Some stations have known sensor limitations — show a brief note
-  // rather than a bare dash, so visitors understand it's a station
-  // characteristic rather than a data loading failure.
-  const noWaterNote = card.dataset.noWater;
-  const noWindNote = card.dataset.noWind;
-  const waterDisplay = waterTemp || (noWaterNote ? `<span class="buoy-no-sensor" title="${noWaterNote}">—</span>` : '—');
-  const windDisplay  = windSpeed  || (noWindNote  ? `<span class="buoy-no-sensor" title="${noWindNote}">—</span>`  : '—');
+  // Any field that comes back empty gets a "see site" tooltip rather
+  // than a bare, unexplained dash — a station-specific note (like
+  // Wilmette's thermistor chain, set via data-no-water/-wind/-air)
+  // takes priority when one exists; every other missing field falls
+  // back to a generic "Reading unavailable: see site" so a visitor
+  // knows to check the buoy's own page rather than assuming the site
+  // failed to load something. Deliberately NOT "<field>: see site"
+  // (e.g. "Wind: see site") — the field name is already right there
+  // via the adjacent <dt>, so repeating it was both redundant AND
+  // grammatically inconsistent with the station-specific notes, which
+  // read as "<reason>: see site" (a specific cause, not a field name).
+  // All three messages now share the exact same "<phrase>: see site"
+  // shape, whether <phrase> is a generic status or a specific reason.
+  //
+  // The `title` attribute alone only reaches sighted mouse users — a
+  // screen reader has no reliable way to surface it on a plain,
+  // non-interactive span. The nested .sr-only span carries the exact
+  // same text into the accessibility tree, in the normal reading
+  // flow, so a screen reader visitor gets the explanation too instead
+  // of just silence or an unexplained dash character.
+  function missingFieldSpan(customNote) {
+    const note = customNote || 'Reading unavailable: see site';
+    return `<span class="buoy-no-sensor" title="${note}">—<span class="sr-only"> (${note})</span></span>`;
+  }
+  const waterDisplay = waterTemp || missingFieldSpan(card.dataset.noWater);
+  const airDisplay   = airTemp   || missingFieldSpan(card.dataset.noAir);
+  const windDisplay  = windSpeed || missingFieldSpan(card.dataset.noWind);
 
   if (!waterTemp && !airTemp && !windSpeed) {
     dataEl.innerHTML = `<span class="buoy-no-data">No current data &mdash; buoy may be out of season or offline</span>`;
@@ -2092,7 +2309,7 @@ function renderBuoyCard(card, record, source) {
   dataEl.innerHTML = `
     <dl>
       <div><dt>Water</dt><dd>${waterDisplay}</dd></div>
-      <div><dt>Air</dt><dd>${airTemp || '—'}</dd></div>
+      <div><dt>Air</dt><dd>${airDisplay}</dd></div>
       <div><dt>Wind</dt><dd>${windDisplay}</dd></div>
     </dl>
     <p class="buoy-card-source-used">via ${sourceLabel}${ageHtml ? `<span class="buoy-age-line">${ageHtml}</span>` : ''}</p>
@@ -2114,10 +2331,17 @@ async function fetchFromNdbc(station) {
   for (const url of urls) {
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`NDBC fetch failed (${res.status})`);
+      if (!res.ok) {
+        console.warn(`[buoy:ndbc] station ${station} responded with HTTP ${res.status} from ${url}`);
+        throw new Error(`NDBC fetch failed (${res.status})`);
+      }
       const record = parseNdbcRealtimeText(await res.text());
       if (record) return record;
+      console.warn(`[buoy:ndbc] station ${station} returned a response but no usable fields from ${url} — possible format change`);
     } catch (err) {
+      if (err instanceof TypeError) {
+        console.warn(`[buoy:ndbc] station ${station} fetch failed before getting a response from ${url} — likely CORS or a network error:`, err.message);
+      }
       // try the next URL, if any
     }
   }
@@ -2147,10 +2371,11 @@ async function initBuoyCards() {
         const ndbcRecord = await fetchFromNdbc(station);
         if (ndbcRecord) {
           renderBuoyCard(card, ndbcRecord, 'ndbc');
+          card._ndbcRecord = ndbcRecord; // kept for the phase-2 freshness comparison below
         } else {
           renderBuoyError(card);
         }
-      } catch (err) {
+      } catch {
         renderBuoyError(card);
       }
     })
@@ -2176,16 +2401,36 @@ async function initBuoyCards() {
   // enhancement, not a co-equal source. A card silently upgrades from
   // NDBC to GLOS data if and when this succeeds; nothing changes for
   // a visitor if it doesn't.
+  //
+  // FRESHNESS GUARD — a successful GLOS response isn't automatically
+  // "the win" on its own. Real-world scenario this actually protects
+  // against: GLOS's dataset loads fine but its *last ingested row* is
+  // hours or days older than what NDBC already served (exactly the
+  // kind of stale-but-technically-valid response the 2026-06-18
+  // GLOS pipeline gap could produce). Comparing observation
+  // timestamps — not just "did the request succeed" — means the card
+  // always ends up showing whichever source's reading is actually
+  // more current, not just whichever source is preferred by default.
+  // If either timestamp is unparseable, that source doesn't block the
+  // comparison (missing data shouldn't accidentally look "freshest").
   await Promise.all(
     Array.from(cards).map(async (card) => {
       const glosId = card.dataset.glosId;
       if (!glosId) return;
       try {
         const glosRecord = await fetchFromGlos(glosId);
-        if (glosRecord) {
-          renderBuoyCard(card, glosRecord, 'glos');
+        if (!glosRecord) return;
+
+        const glosTime = getObservedAt(glosRecord, 'glos');
+        const ndbcTime = card._ndbcRecord ? getObservedAt(card._ndbcRecord, 'ndbc') : null;
+        const glosIsStale = glosTime && ndbcTime && glosTime.getTime() < ndbcTime.getTime();
+        if (glosIsStale) {
+          console.log(`[buoy:glos] station ${card.dataset.station}: GLOS answered but its reading (${glosTime.toISOString()}) is older than NDBC's (${ndbcTime.toISOString()}) — keeping NDBC on screen.`);
+          return;
         }
-      } catch (err) {
+
+        renderBuoyCard(card, glosRecord, 'glos');
+      } catch {
         // GLOS failed — the card already shows NDBC data from phase
         // 1, so there's nothing further to do here.
       }
@@ -2194,10 +2439,17 @@ async function initBuoyCards() {
 }
 
 // ===================================================================
-// DEV TESTING PANEL — weather category override buttons.
-// TO REMOVE BEFORE PRODUCTION: delete this function and the
-// initDevWeatherPanel() call below. Everything is self-contained here;
-// nothing else in the app depends on this function.
+// DEV TESTING PANEL — weather category override buttons. Ships to
+// production deliberately (not stripped) — CSS now defaults this to
+// display:none on its own (see #devWeatherPanel in styles.css), so it
+// stays genuinely hidden from normal visitors regardless of whether
+// this JS runs, while still being reachable via F1 for the site owner
+// on the live site. An earlier version of this comment said to strip
+// this function out for production — that was tried, and it broke
+// worse than leaving it in: this function was the ONLY thing that
+// ever set the panel to display:none, so removing just the JS while
+// leaving the CSS/HTML in place made the panel default to visible
+// with no way to hide it, rather than not existing at all.
 // ===================================================================
 function initDevWeatherPanel() {
   const panel = document.getElementById('devWeatherPanel');
@@ -2333,6 +2585,232 @@ async function checkLink(url) {
   }
 }
 
+// ===================================================================
+// RESOURCES ACCORDION — some categories auto-expand under the right
+// conditions rather than always starting closed:
+//  - Boating and Fishing (the two busiest, most-browsed categories)
+//    start OPEN whenever the viewport is wide enough for the 3-column
+//    desktop layout (see data-auto-expand-min-width below) — a mouse/
+//    sighted visitor there sees the full list right away, exactly
+//    like the old always-expanded layout.
+//  - Parks, Travel, and Water Safety instead each auto-expand once
+//    the viewport is TALL enough to comfortably fit them without
+//    pushing everything else off-screen (see each one's own
+//    data-auto-expand-min-height below) — more vertical room means
+//    more categories can stay open without cost. This is purely
+//    height-driven and works at any viewport width, not just at a
+//    specific reference width.
+// Every other category, and all of these on a short/narrow viewport,
+// starts closed.
+//
+// The auto-open state creates a tradeoff for keyboard/screen-reader
+// visitors though: without something extra, they'd have to Tab past
+// every link in each open group just to reach the ones after it. So
+// the FIRST time keyboard focus (not a mouse click) lands in an
+// auto-expanded group, it auto-collapses — the visitor can still
+// reopen it with Enter/Space if they want the list, but the default
+// path skips straight past it, same as every other category. This
+// only fires once per group per page load; after that it's a normal
+// accordion the visitor fully controls.
+//
+// HOW THE min-height THRESHOLDS WERE CALCULATED — Parks, Travel, and
+// Water Safety open in that order as the viewport grows taller, each
+// threshold marking "enough room for every group up to and including
+// this one to sit open at once." Solving for the two unknowns (a
+// fixed per-group header/margin cost, and a per-link row cost) from
+// the gaps between the three original thresholds and each group's
+// link count gives a clean, exact fit:
+//     50px per link (row height) + 78px fixed overhead per group
+// i.e. threshold(group) = previous threshold + 78 + 50 * linkCount.
+// Water Safety (7 links) originally landed at 2228px — 68px past a
+// real 4K TV's 2160px viewport height, which is why it wasn't
+// expanding there. All three thresholds below are shifted down by
+// that same 68px (preserving the 50px/78px rate, not re-guessing it),
+// landing Water Safety exactly on 2160px so all 5 categories are open
+// on a 4K TV: Parks 1454, Travel 1732, Water Safety 2160.
+//
+// RECALCULATING AFTER A LINK IS ADDED/REMOVED — each group's
+// data-auto-expand-link-count records the count its current
+// data-auto-expand-min-height was calculated for. isLinkCountStale()
+// below compares that against the real, live <li> count and warns in
+// the console if they've drifted apart (e.g. a link was added to
+// Parks) — since inserting a link into an earlier group changes how
+// much room every LATER group needs too, a single change can mean
+// re-deriving more than one threshold, which is worth doing
+// deliberately rather than silently auto-patching in production.
+// Using the rate above: a group gaining/losing N links shifts its own
+// threshold AND every later group's threshold by N * 50px.
+// ===================================================================
+function initResourceAccordionBehavior() {
+  const autoExpandGroups = Array.from(document.querySelectorAll('.res-group--auto-expand'));
+  if (!autoExpandGroups.length) return;
+
+  autoExpandGroups.forEach((el) => {
+    const recordedCount = el.dataset.autoExpandLinkCount;
+    if (recordedCount) {
+      const actualCount = el.querySelectorAll('li').length;
+      if (actualCount !== parseInt(recordedCount, 10)) {
+        const groupName = el.querySelector('h3')?.textContent || '(unnamed group)';
+        console.warn(
+          `[resources accordion] "${groupName}" now has ${actualCount} links but its ` +
+          `data-auto-expand-min-height was calculated for ${recordedCount}. Its threshold ` +
+          `(and every later group's, by the same 50px-per-link rate) is now stale — ` +
+          `see the comment above initResourceAccordionBehavior() in script.js to recalculate.`
+        );
+      }
+    }
+  });
+
+  // Matches styles.css's own mobile/desktop breakpoint exactly (see
+  // that @media rule's comment for the full reasoning) — touch-
+  // primary devices always count as mobile regardless of width, so
+  // an iPad in landscape still gets every group collapsed even though
+  // it's wide enough to otherwise clear the per-group width/height
+  // conditions below. Defined once and shared rather than duplicated
+  // per group, both for efficiency and so it can't drift out of sync
+  // with itself across groups.
+  const mobileMql = window.matchMedia('(max-width: 1333px), (max-height: 700px), (hover: none) and (pointer: coarse)');
+
+  autoExpandGroups.forEach((el) => {
+    // Each group declares exactly one condition: a min-width (the
+    // existing "wide enough for desktop" case) or a min-height (the
+    // new "tall enough to spare" case).
+    const minWidth = el.dataset.autoExpandMinWidth;
+    const minHeight = el.dataset.autoExpandMinHeight;
+    const query = minWidth ? `(min-width: ${minWidth}px)` : `(min-height: ${minHeight}px)`;
+    const mql = window.matchMedia(query);
+
+    function applyResponsiveDefault() {
+      // Don't stomp on a state the visitor has already interacted
+      // with this page load (either by clicking, or via the
+      // keyboard auto-collapse below).
+      if (el.dataset.userToggled === 'true' || el.dataset.autoCollapsed === 'true') return;
+      // Mobile always wins, regardless of what the per-group width/
+      // height condition would otherwise say — every group starts
+      // collapsed on mobile, full stop.
+      if (mobileMql.matches) {
+        el.open = false;
+        return;
+      }
+      el.open = mql.matches;
+    }
+    applyResponsiveDefault();
+    mql.addEventListener('change', applyResponsiveDefault);
+    mobileMql.addEventListener('change', applyResponsiveDefault);
+
+    // A real click/tap on the summary is the visitor intentionally
+    // choosing a state — stop treating this group as "responsive
+    // default" territory from then on, same as after a keyboard
+    // auto-collapse.
+    const summary = el.querySelector('summary');
+    if (summary) {
+      summary.addEventListener('click', () => {
+        el.dataset.userToggled = 'true';
+      });
+    }
+
+    el.addEventListener('focusin', () => {
+      if (el.dataset.autoCollapsed === 'true') return;
+      if (!isKeyboardNav()) return;
+      if (!el.open) return;
+      el.open = false;
+      el.dataset.autoCollapsed = 'true';
+    });
+  });
+}
+
+initResourceAccordionBehavior();
+
+// ===================================================================
+// RESOURCES ACCORDION — SCROLL INTO VIEW. When a visitor expands a
+// group (any of the 5 — this isn't limited to the auto-expand ones),
+// scroll its summary to the top of the resources column so the
+// content that just appeared is actually visible, rather than
+// expanding silently below the fold and requiring a manual scroll to
+// discover. Reuses the same scroll-margin-top already set up for
+// WCAG 2.4.11 (see that rule in styles.css), so this correctly clears
+// both the fixed page header and the column's own sticky heading —
+// no separate offset math needed here.
+//
+// Only fires for a visitor's own click/tap (or keyboard activation,
+// which synthesizes a click same as a mouse would) — NOT for the
+// responsive auto-expand/collapse logic above setting .open
+// programmatically on load or resize, which should never yank the
+// page around without the visitor having done anything.
+// ===================================================================
+function initResourceAccordionScrollIntoView() {
+  const allGroups = document.querySelectorAll('.res-group');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  allGroups.forEach((el) => {
+    const summary = el.querySelector('summary');
+    if (!summary) return;
+
+    let userInitiated = false;
+    summary.addEventListener('click', () => {
+      userInitiated = true;
+    });
+
+    el.addEventListener('toggle', () => {
+      if (el.open && userInitiated) {
+        summary.scrollIntoView({
+          behavior: reduceMotion.matches ? 'auto' : 'smooth',
+          block: 'start',
+        });
+      }
+      userInitiated = false;
+    });
+  });
+}
+
+initResourceAccordionScrollIntoView();
+
+// ===================================================================
+// FONT FALLBACK — the self-hosted files in assets/fonts/ are the
+// intended path (fast, same-origin), but if they ever fail to load —
+// wrong deploy path, files not uploaded, whatever the cause — this
+// checks for that and pulls in Google's own CDN as a backup, rather
+// than silently falling through to the browser's generic system font.
+//
+// Deliberately NOT hardcoding Google's font-file URLs directly into
+// the @font-face src list in styles.css: those are long, opaque,
+// per-file hashes (e.g. .../UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2bo...)
+// that Google can and does change over time, and guessing at the 7
+// I couldn't independently verify would risk shipping URLs that
+// silently 404 — the exact failure mode this exists to protect
+// against. Falling back to Google's own CSS endpoint instead sidesteps
+// that: Google resolves the correct current file on its own, so
+// there's nothing here that can go stale.
+//
+// Cost if local fonts load fine (the expected case): zero — this
+// check runs, finds everything already loaded, and does nothing
+// further. Cost if they don't: same as the original Google-Fonts-CDN
+// setup this replaced — worse than the ideal, but strictly better
+// than missing fonts, and only reached if something's already wrong.
+// ===================================================================
+function initFontFallback() {
+  if (!('fonts' in document)) return; // very old browser — nothing to check with
+
+  const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
+  const check = Promise.all([
+    document.fonts.load('400 16px Inter'),
+    document.fonts.load('700 16px "Plus Jakarta Sans"'),
+  ]).catch(() => {}); // a rejected load() also means "didn't load" — the check below still catches it
+
+  Promise.race([check, timeout]).then(() => {
+    const interOk = document.fonts.check('400 16px Inter');
+    const jakartaOk = document.fonts.check('700 16px "Plus Jakarta Sans"');
+    if (interOk && jakartaOk) return; // self-hosted fonts are working — nothing to do
+
+    console.warn('[fonts] self-hosted font files did not load — falling back to Google Fonts CDN.');
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap';
+    document.head.appendChild(link);
+  });
+}
+initFontFallback();
+
 async function initLinkHealthChecker() {
   if (!LINK_CHECK_PROXY_URL) return;
 
@@ -2445,10 +2923,41 @@ initBuoyCards();
 // ===================================================================
 const DATA_REFRESH_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
+// The weather card, buoy cards, and Illinois beach list are all
+// aria-live="polite" so a screen reader announces them once real data
+// replaces the initial "Loading…" placeholder — appropriate on first
+// load, but this same markup was also making every silent 15-minute
+// background refresh (or tab-refocus refresh) interrupt a visitor
+// with an announcement for numbers that usually haven't even changed.
+// Muting these regions specifically around a background refresh (and
+// restoring them once it's done) keeps the initial-load announcement
+// intact while stopping that recurring interruption.
+function setLiveRegionsMuted(muted) {
+  const ids = ['weatherContentSlmo', 'weatherContentLocal', 'ilBeachList'];
+  const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
+  document.querySelectorAll('.buoy-card-data').forEach((el) => els.push(el));
+  els.forEach((el) => {
+    if (muted) {
+      el.dataset.liveRestore = el.getAttribute('aria-live') || '';
+      el.setAttribute('aria-live', 'off');
+    } else if (el.dataset.liveRestore !== undefined) {
+      el.setAttribute('aria-live', el.dataset.liveRestore || 'polite');
+      delete el.dataset.liveRestore;
+    }
+  });
+}
+
 async function refreshLiveData() {
-  await initIlBeachguard();
-  initBuoyCards(); // not awaited — its own UI updates independently, nothing downstream depends on its completion
-  initWeather(); // also not awaited, same reasoning — previously excluded from refresh entirely, which let it go stale indefinitely on a long-open tab while everything else around it updated
+  setLiveRegionsMuted(true);
+  try {
+    await Promise.all([
+      initIlBeachguard(),
+      initBuoyCards(),
+      initWeather(),
+    ]);
+  } finally {
+    setLiveRegionsMuted(false);
+  }
 
   // Re-apply any active search now that the Illinois list has been
   // rebuilt — without this, a search typed in right before the timer

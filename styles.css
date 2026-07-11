@@ -1,4 +1,27 @@
 /* ===================================================================
+   TABLE OF CONTENTS — search for the ALL-CAPS heading text below to
+   jump to a section (line numbers aren't listed here since they drift
+   as the file changes; the heading text doesn't).
+
+   DESIGN TOKENS ................. CSS custom properties (colors, etc.)
+   HIGH CONTRAST MODE ............ data-high-contrast="on" overrides
+   CONSENT BANNER ................ first-visit full-screen modal
+   ACCESSIBILITY BASICS .......... skip link, focus rings, tap targets
+   HEADER ......................... fixed glass header, nav, controls
+   PAGE WRAPPER ................... sits beneath the fixed header
+   3-COLUMN LAYOUT (Grid) ......... shared grid + per-column base styles
+     LEFT: RESOURCES .............. resources accordion, link list
+     CENTER: MAIN INTERACTIVE MAPS  dashboard cards, weather card
+     CENTER: BUOY CARDS ........... Lake Michigan buoy data cards
+     RIGHT: ALERTS ................ beach advisories, badges
+   ABOVE-HD SCALING ............... fluid layout scaling above 1920px
+   FOOTER .......................... partner logos, contact, disclaimer
+   ZOOM / REFLOW SUPPORT (WCAG 1.4.10) .. releases the 100vh lock
+   FOCUS RING — CONTEXTUAL COLOR OVERRIDES (deliberately last — see
+     that section's own comment for why)
+=================================================================== */
+
+/* ===================================================================
    SOUTHERN LAKE MICHIGAN OUTDOORS — DESIGN TOKENS
    Palette derived from brand logo: navy / deep teal / light teal / olive bluff / sun
 =================================================================== */
@@ -7,7 +30,6 @@
   --navy-light: #1F4D7A;
   --teal-deep: #1C7293;
   --teal-light: #6FB7D1;
-  --olive: #5C6B3F;
   --sun: #F2A93B;
   --paper: #F6F8F9;
   --layout-bg: #13294B;
@@ -31,13 +53,123 @@
      since every pixel of header height is a pixel the columns don't get */
   --header-padding-bottom: 12px;
   --header-top-gap: 20px;
-  --content-max-width: 1669px; /* shared by header, layout, and footer so their left/right edges always align */
-  --footer-h: 0px; /* footer is part of normal scroll flow within main when zoomed; 0 in 100vh mode */
+  /* Up to ~1944px this resolves flat at 1554px, up from the original
+     1400px (an earlier pass landed on 1434px for a 570px target —
+     revised up further since the real target is 620px) — bumped
+     specifically so the CENTER column (Main/Buoys, 41 of the layout's
+     96 fr units, with a 580px floor) reaches at least 620px of
+     actually-usable width at 1920x1080, not just as a raw grid-track
+     number but after subtracting what actually eats into it: the
+     column's own 40px padding (.col, 20px each side) and a classic
+     ~17px Windows scrollbar (these columns are overflow-y: auto, and
+     non-overlay scrollbars — the Windows default — take up real
+     horizontal space rather than floating over the content). Margin
+     is what pays for this, same as the ramp below already does above
+     1920px: 9.53% at 1920px now, down from 13.5% originally. */
+  --content-max-width: 1554px;
   --focus-ring: 3px solid #0B5FFF;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+
+/* ===================================================================
+   SELF-HOSTED FONTS — previously loaded from Google Fonts (two
+   cross-origin round trips: the CSS file, then the actual font file,
+   even with preconnect helping the connection setup). Self-hosting
+   removes that entirely; the exact same 8 weight files (woff2 only —
+   universal in every browser Lighthouse tests against, so there's no
+   reason to also ship the larger legacy .woff fallback), sourced
+   directly from the same @fontsource packages Google's own CSS
+   ultimately points at, not a different/approximate substitute.
+=================================================================== */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/plus-jakarta-sans-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/plus-jakarta-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/fonts/plus-jakarta-sans-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('assets/fonts/plus-jakarta-sans-latin-800-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+
+/* ===================================================================
+   ICONS — inline SVG (via <use> referencing the sprite near the top
+   of <body>) rather than an icon-font framework. width/height:1em +
+   fill:currentColor is the standard technique that lets every
+   existing color/font-size rule written for the old icon-font <i>
+   elements keep working unchanged on these — same cascade, same
+   sizing behavior, just a different element. vertical-align nudges
+   the icon up slightly since inline SVGs default to baseline
+   alignment, which reads a touch low next to adjacent text otherwise.
+=================================================================== */
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+/* Loading-spinner rotation — previously came from Font Awesome's own
+   CSS; reimplemented here since that stylesheet is gone. */
+@keyframes fa-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.fa-spin {
+  animation: fa-spin 2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-spin { animation: none; }
+}
 
 /* ===================================================================
    HIGH CONTRAST MODE — activated by data-high-contrast="on" on <html>
@@ -51,7 +183,6 @@ html[data-high-contrast="on"] {
   --navy-light:  #000000;
   --teal-deep:   #000000;
   --teal-light:  #000000;  /* was #fff — caused main-blurb-rule to be invisible */
-  --olive:       #000000;
   --sun:         #ffffff;
   --paper:       #ffffff;
   --layout-bg:   #000000;
@@ -65,11 +196,18 @@ html[data-high-contrast="on"] {
   --warn-text:   #000000;
   --danger-bg:   #ffffff;
   --danger-text: #000000;
-  /* Yellow focus ring: maximum visibility on both black and white */
-  --focus-ring:  3px solid #ffff00;
+  /* Blue focus ring: yellow looked strong here but actually failed on
+     white (1.07:1 — barely visible against the columns, which are the
+     majority of this page). #0B5FFF is the same blue this site
+     already uses as its normal-mode --focus-ring (see :root above) —
+     it's the standard "visible on light AND dark" accessible focus
+     color for exactly this reason: 5.1:1 against white, 4.1:1 against
+     black, comfortably clearing the 3:1 WCAG non-text minimum on both
+     ends rather than maxing out one and failing the other. */
+  --focus-ring:  3px solid #0B5FFF;
 }
 html[data-high-contrast="on"] *:focus-visible {
-  outline: 3px solid #ffff00 !important;
+  outline: 3px solid #0B5FFF !important;
   outline-offset: 2px !important;
 }
 html[data-high-contrast="on"] .site-header {
@@ -80,7 +218,7 @@ html[data-high-contrast="on"] .col,
 html[data-high-contrast="on"] .col-main-wrapper {
   background: #fff !important;
   outline: 2px solid #000;
-  outline-offset: -2px;
+  outline-offset: 0px;
 }
 /* bg-video is restored in high contrast (no display:none) — the video
    toggle button is visible and has meaning; hiding the video would make
@@ -144,6 +282,25 @@ html[data-high-contrast="on"] .nav-toggle--active {
   color: #000 !important;
   border-color: #000 !important;
 }
+/* Dev weather panel — its background is always dark (rgba(0,0,0,0.75)),
+   in every mode, unlike the rest of the page. The blanket high-contrast
+   "button { color: #000 }" rule above doesn't know that and was
+   forcing black-on-near-black text here, making the panel unreadable.
+   Pin its text explicitly instead of letting it inherit the blanket
+   light-mode assumption. */
+html[data-high-contrast="on"] #devWeatherPanel {
+  background: #000 !important;
+  border: 1px solid #fff;
+}
+html[data-high-contrast="on"] #devWeatherPanel button {
+  color: #fff !important;
+  border-color: #fff !important;
+  background: rgba(255,255,255,0.08) !important;
+}
+html[data-high-contrast="on"] #devWeatherPanel button.dev-active {
+  background: #fff !important;
+  color: #000 !important;
+}
 /* Status indicators — accessible saturated colors that meet WCAG 3:1
    non-text contrast on white backgrounds.
    Pure #00ff00 and #ffff00 fail contrast on white (1.4:1 and 1.07:1).
@@ -157,9 +314,16 @@ html[data-high-contrast="on"] .res-link-status--ok      { background: #00b300 !i
 html[data-high-contrast="on"] .res-link-status--unknown  { background: #e6a000 !important; border: none !important; box-shadow: 0 0 0 1px #000 !important; width: 8px !important; height: 8px !important; }
 html[data-high-contrast="on"] .res-link-status--dead     { background: #ff0000 !important; border: none !important; box-shadow: none !important; width: 8px !important; height: 8px !important; }
 html[data-high-contrast="on"] .res-link-status--checking { background: #808080 !important; border: none !important; box-shadow: none !important; width: 8px !important; height: 8px !important; }
-/* Beach status badges */
-html[data-high-contrast="on"] .badge--ok      { background: #00b300 !important; color: #fff !important; box-shadow: 0 0 0 1px #000 !important; }
-html[data-high-contrast="on"] .badge--warn     { background: #e6a000 !important; color: #000 !important; box-shadow: 0 0 0 1px #000 !important; }
+/* Beach status badges — these carry actual text, not just a color
+   swatch, so the WCAG bar is the full 4.5:1 text minimum rather than
+   the 3:1 non-text minimum the dots above only need. White text on
+   the dots' own #00b300/#e6a000 only reaches 2.8:1 / 2.2:1 — visibly
+   readable but not compliant. #008a00 and #9e6e00 are the same hues
+   darkened just enough (4.5:1 / 4.5:1 with white text) to pass while
+   still reading clearly as "green" and "amber" next to the red/grey
+   badges. */
+html[data-high-contrast="on"] .badge--ok      { background: #008a00 !important; color: #fff !important; box-shadow: 0 0 0 1px #000 !important; }
+html[data-high-contrast="on"] .badge--warn     { background: #9e6e00 !important; color: #fff !important; box-shadow: 0 0 0 1px #000 !important; }
 html[data-high-contrast="on"] .badge--danger   { background: #ff0000 !important; color: #fff !important; box-shadow: none !important; }
 html[data-high-contrast="on"] .badge--unknown  { background: #808080 !important; color: #fff !important; box-shadow: none !important; }
 /* Buoy data age — small text, just make it black for legibility */
@@ -167,7 +331,6 @@ html[data-high-contrast="on"] .buoy-age--fresh,
 html[data-high-contrast="on"] .buoy-age--stale,
 html[data-high-contrast="on"] .buoy-age--old   { color: #000 !important; }
 /* Video control icons — explicitly white since they sit on #000 background */
-html[data-high-contrast="on"] .bg-video-btn i,
 html[data-high-contrast="on"] .bg-video-btn svg { color: #fff !important; fill: #fff !important; }
 
 /* Scales the root font-size down when the viewport is shorter than
@@ -192,6 +355,24 @@ body {
   top: 0 !important; /* Google Translate's banner frame otherwise pushes
                          the whole page down via an inline style on body
                          — this keeps our fixed 100vh layout intact */
+}
+/* SCROLL LOCK — while a fixed-position overlay (currently just the
+   consent banner) is open, pins body in place at its exact scroll
+   position via position:fixed + a negative top offset, rather than
+   relying on plain overflow:hidden alone — iOS Safari is known to
+   still permit touch-drag scrolling of the page underneath a fixed
+   overlay even with overflow:hidden set, so this is the more robust
+   standard technique. --scroll-lock-offset is set by lockBodyScroll()
+   in script.js. The class selector here (specificity 0,1,1) is what
+   lets its !important correctly outrank the plain `body` rule's own
+   !important above (specificity 0,0,1) — two !important declarations
+   still fall back to normal specificity as the tiebreaker. */
+body.scroll-locked {
+  position: fixed !important;
+  top: var(--scroll-lock-offset, 0) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
 }
 
 /* Establishes header/page-wrapper/footer as a real flex column with a
@@ -338,7 +519,7 @@ body {
   line-height: 1.5;
   color: var(--ink-soft);
 }
-.consent-storage-note i {
+.consent-storage-note .icon {
   color: var(--teal-deep);
   flex-shrink: 0;
   margin-top: 2px;
@@ -415,6 +596,41 @@ body {
   accent-color: var(--sun);
   cursor: pointer;
 }
+/* WCAG 2.5.8 Target Size (Minimum) — explicit 24x24 thumb in both
+   engines, rather than leaving it to each browser's own default
+   (Chrome/Windows in particular defaults to well under 24px). Track
+   stays the same thin 4px visual line via the width/height above;
+   only the draggable thumb itself needs the larger hit area. */
+/* Visually smaller than the 24x24 box below, on purpose: transform is
+   paint-only and doesn't shrink the box browsers use for hit-testing,
+   so the actual clickable/draggable target stays the full 24x24 —
+   only the *painted appearance* shrinks to something closer to a
+   typical compact video-player slider dot. This is the same
+   small-target-big-hit-area technique most polished video players
+   use (visible dot noticeably smaller than the real tap target) —
+   flagging honestly that the exact size of any specific player's own
+   thumb wasn't independently verified here, since that requires
+   inspecting its live rendered CSS rather than reading documentation;
+   this uses the general technique rather than copying a specific
+   unverified pixel value. */
+.bg-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sun);
+  cursor: pointer;
+  transform: scale(0.5);
+}
+.bg-volume-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sun);
+  border: none;
+  cursor: pointer;
+  transform: scale(0.5);
+}
 .bg-audio-track-label {
   font-size: 0.65rem;
   color: rgba(255,255,255,0.7);
@@ -432,6 +648,12 @@ body {
   align-items: center;
   justify-content: center;
   height: 22px;
+  min-height: 24px; /* WCAG 2.5.8 Target Size (Minimum) — the sitewide
+     `button { min-height: 24px }` rule already constrains the
+     rendered box to 24px regardless of the 22px height above (min-
+     height always wins as a floor), but that protection was implicit
+     and fragile — stating it explicitly here removes any doubt and
+     survives future edits to this rule even if the global one changes. */
   background: transparent;
   border: none;
   border-radius: 999px;
@@ -660,6 +882,7 @@ a, button {
   font-family: var(--font-body);
   font-size: 0.85rem;
   padding: 8px 12px;
+  padding-right: 16px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
@@ -733,14 +956,68 @@ a, button {
 .layout {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(420px, 550px) minmax(620px, 705px) minmax(280px, 350px);
-  justify-content: center; /* once columns hit their max-widths, center the group with side margins */
+  /* fr (not a fixed px max) lets each column keep growing in
+     proportion to the others as --content-max-width scales with the
+     viewport, instead of hard-capping at a fixed width and leaving
+     unused space stranded inside the (now fluid) container. Ratio
+     is 32:41:27 — Alerts (3rd column) carries more relative weight
+     than the original 33:42:21 (which was tuned to 550:705:350 at a
+     1669px reference width) specifically so it reaches 453px at the
+     2268px anchor point above; columns 1 and 2 keep essentially their
+     original relative sizing.
+     Floors (400/580/260px) ARE changed from the original design
+     (420/620/280) — trimmed down proportionally so the 3-column
+     layout still fits without overflow at the new, lower mobile-vs-
+     desktop width floor (1333px — see the mobile breakpoint's own
+     comment for why that moved). 400+580+260 = 1240px + 64px
+     (padding+gaps) = 1304px, comfortably under both that floor and
+     1366px (the single most common laptop screen resolution), with
+     room to spare. */
+  grid-template-columns: minmax(400px, 32fr) minmax(580px, 41fr) minmax(260px, 27fr);
+  justify-content: center; /* once columns hit their min-widths on a narrower desktop, center the group with side margins */
   min-height: 0; /* required so grid children can shrink + scroll within fixed viewport */
   gap: 16px;
   max-width: var(--content-max-width);
   margin-inline: auto;
   padding: var(--measured-header-clearance, calc(var(--header-h) + var(--header-top-gap) + 16px)) 16px 0 16px;
   overflow: hidden;
+}
+
+/* ===================================================================
+   ABOVE-HD SCALING — two segments, both driving the shared
+   --content-max-width variable (so header/layout/footer stay aligned,
+   same as always). The margin stays at its now-1554px-based value up
+   through 1920px (standard HD) — nothing below gives up more than
+   that. Only above 1920px does it ease down further, and only by
+   exactly as much as the Alerts column's widened share (see the fr
+   ratio on .layout below) needs to reach 453px right at the 2268px
+   anchor:
+
+   1920px -> 2268px: linear ramp from the 1554px baseline (see that
+   variable's own comment for why it's 1554) to the 2268px anchor
+   point (1742.72px, unchanged from before — still the width that
+   gives columns 1 and 2 their normal sizing, with the extra room the
+   Alerts column needs on top of its own proportional share, rather
+   than pulled from columns 1/2). Coefficients from the standard
+   two-point fluid-scaling formula:
+     slope   = (1742.72 - 1554) / (2268 - 1920) = 0.5423   (per px of viewport)
+     content = 1554 + slope * (100vw - 1920px) = 512.79px + 54.23vw
+   2268px and up: holds the exact ratio reached at the 2268px anchor
+   (1742.72 / 2268 = 76.84%) flat all the way up, instead of ramping
+   further — margin settles at ~11.6% per side and stays there through
+   4K and beyond, so a 4K TV is this exact 2268px layout scaled up,
+   not a wider/emptier version of it. This end anchor is untouched by
+   the 1920px base change, so nothing above 2268px moves at all.
+=================================================================== */
+@media (min-width: 1920px) and (max-width: 2268px) {
+  :root {
+    --content-max-width: calc(512.79px + 54.23vw);
+  }
+}
+@media (min-width: 2268px) {
+  :root {
+    --content-max-width: 76.84vw;
+  }
 }
 
 .col {
@@ -846,10 +1123,62 @@ a, button {
   border-radius: 12px 12px 0 0;
   z-index: 1;
 }
-.col-heading i { color: var(--teal-deep); }
+.col-heading .icon { color: var(--teal-deep); }
 
 /* ---------- LEFT: RESOURCES ---------- */
-.res-group { margin-bottom: 22px; }
+/* Each category is a native <details>/<summary> disclosure instead of
+   an always-expanded list. This lets a screen reader (or keyboard)
+   user tab from category to category — Boating, Fishing, Parks,
+   Travel, Water Safety — and only drill into a category's individual
+   links once they've chosen to expand it, rather than having to tab
+   past every link in every category to reach the ones they want.
+   <summary> is natively focusable/keyboard-toggleable (Enter/Space)
+   and its collapsed content is automatically removed from the tab
+   order and accessibility tree — no extra ARIA or JS required. The
+   heading is nested INSIDE the summary (rather than replacing it) so
+   the category name is still exposed as a real heading for users
+   navigating by heading level, in addition to being the disclosure's
+   accessible name. */
+.res-group { margin-bottom: 10px; border-bottom: 1px solid rgba(19, 41, 75, 0.1); }
+.res-group:last-of-type { border-bottom: none; }
+.res-group-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none; /* Firefox's default marker */
+  padding: 10px 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+.res-group-summary::-webkit-details-marker { display: none; } /* Chrome/Safari's default marker */
+.res-group-summary::marker { content: ''; } /* belt-and-suspenders for the two rules above */
+.res-group-summary:hover,
+.res-group-summary:focus-visible {
+  background: var(--paper);
+}
+.res-group-summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+/* Custom chevron, rotates to point up when the category is expanded */
+.res-group-summary::after {
+  content: '';
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--teal-deep);
+  border-bottom: 2px solid var(--teal-deep);
+  transform: rotate(45deg);
+  transition: transform 0.25s ease;
+}
+.res-group[open] .res-group-summary::after {
+  transform: rotate(-135deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .res-group-summary::after { transition: none; }
+}
 .res-group h3 {
   font-family: var(--font-body);
   font-size: 0.78rem;
@@ -857,7 +1186,10 @@ a, button {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--teal-deep);
-  margin-bottom: 8px;
+  margin: 0;
+}
+.res-group ul {
+  margin: 4px 0 12px 0;
 }
 .res-group ul li {
   margin-bottom: 2px;
@@ -968,7 +1300,7 @@ a, button {
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
-.res-group a i:first-child { color: var(--navy-light); width: 18px; text-align: center; flex-shrink: 0; }
+.res-group a .icon:first-child { color: var(--navy-light); flex-shrink: 0; }
 /* !important is the right tool here, not a smell to work around: this
    icon needs to reliably win against ANY ancestor `color: inherit`
    rule (e.g. .beachguard-head h3 a below), in any context this class
@@ -1083,24 +1415,41 @@ a, button {
 .dash-card-media {
   flex: 1 1 auto;
   position: relative;
-  background-repeat: no-repeat;
-  background-size: 100% auto; /* fill width exactly, preserve aspect ratio */
-  background-position: bottom center; /* anchor to bottom; excess height clips off the top */
   overflow: hidden;
 }
+.dash-card-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* fills the card, preserves aspect ratio, crops excess — same visual result the old background-size:100% auto produced */
+}
+/* Darkening gradient for footer-text legibility — previously baked
+   into the background-image itself; now a separate layer since the
+   photo is a real <img> (for alt text) rather than a CSS background. */
+.dash-card-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(19,41,75,0) 55%, rgba(19,41,75,0.65) 100%);
+  pointer-events: none;
+}
 
-/* Real shoreline photography, referenced at the exact paths supplied.
-   --glow-color feeds the hover shadow above, tinting each card's lift
-   to match its own scene: lake-water teal for Illinois, dune olive
-   for Indiana, rather than one shared generic shadow color. */
+/* Real shoreline photography. --glow-color feeds the hover shadow
+   above, tinting each card's lift to match its own scene: lake-water
+   teal for Illinois, dune olive for Indiana, rather than one shared
+   generic shadow color. */
 .dash-card-media--il {
-  background-color: #6FB7D1;
-  background-image: linear-gradient(180deg, rgba(19,41,75,0) 55%, rgba(19,41,75,0.65) 100%), url('assets/Explore_IL.png');
+  background-color: #6FB7D1; /* shows briefly while the photo loads */
+}
+.dash-card-media--il img {
+  object-position: bottom center; /* anchor to bottom; excess height clips off the top */
 }
 .dash-card-media--in {
-  background-color: #5C6B3F;
-  background-image: linear-gradient(180deg, rgba(19,41,75,0) 55%, rgba(19,41,75,0.65) 100%), url('assets/Explore_IN.png');
-  background-position: center center; /* centers on the image rather than
+  background-color: #5C6B3F; /* shows briefly while the photo loads */
+}
+.dash-card-media--in img {
+  object-position: center center; /* centers on the image rather than
      anchoring to the bottom like the Illinois card — excess height
      clips evenly off both the top and bottom instead of just the top */
 }
@@ -1150,13 +1499,23 @@ a, button {
   min-height: 0;
   padding: 21px 0;
 }
+/* Desktop-specific override (1920x1080 and similar) — 15px top/bottom
+   instead of the 21px mobile default. Matches the inverse of the
+   site's own mobile-detection logic (min-width/min-height floors AND
+   hover-capable/fine-pointer, not just a width check) so this stays
+   correctly aligned with genuinely non-touch desktop viewports rather
+   than an iPad landscape window that happens to be wide enough. */
+@media (min-width: 1334px) and (min-height: 701px) and (hover: hover) and (pointer: fine) {
+  .main-blurb-zone {
+    padding: 15px 0;
+  }
+}
 
 .main-blurb {
   position: relative;
   margin: 0 auto;
   max-width: 520px;
   text-align: center;
-  padding-top: 4px;
 }
 .main-blurb-rule {
   width: 56px;
@@ -1208,7 +1567,34 @@ a, button {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
-.buoy-heading i { color: var(--teal-deep); font-size: 0.95rem; }
+
+/* ===================================================================
+   WCAG 2.4.11 FOCUS NOT OBSCURED (MINIMUM) — every column has its own
+   sticky heading (.col-heading, position:sticky top:0), which can
+   cover a keyboard-focused element scrolled up underneath it: Tab to
+   a link deep in a long resources list, buoy grid, or alerts column,
+   and the browser's default "scroll the newly-focused element into
+   view" can land it right at the top of that column's own scrollport
+   — exactly where the sticky heading sits, hiding the very thing that
+   just received focus.
+
+   The Buoys jump-target above already solved this for itself with a
+   combined clearance (fixed page header + sticky column heading —
+   both are needed since this has to work correctly in the desktop
+   independently-scrolling-column layout AND the reflowed/mobile
+   single-page-scroll layout). Applying that same combined value to
+   every focusable element in every column, rather than one heading at
+   a time, is what actually fixes the underlying problem generally.
+   All three columns share the exact same .col-heading height (same
+   class, same CSS), so the one JS-measured
+   --measured-maps-heading-clearance value is reused for all three
+   rather than measuring each column's heading separately. */
+.col-resources :is(a, button, summary, input, select),
+.col-main-wrapper :is(a, button, summary, input, select),
+.col-alerts :is(a, button, summary, input, select) {
+  scroll-margin-top: calc(var(--measured-header-clearance, calc(var(--header-h) + var(--header-top-gap) + 16px)) + var(--measured-maps-heading-clearance, 63px));
+}
+.buoy-heading .icon { color: var(--teal-deep); font-size: 0.95rem; }
 
 .buoy-grid {
   display: grid;
@@ -1265,7 +1651,7 @@ a, button {
      the word level. Without this, the external-link icon can orphan
      onto its own line (seen on "Winthrop Harbor", the longest title). */
 }
-.buoy-card-title a i { font-size: 0.62rem; color: var(--ink-soft); }
+.buoy-card-title a .icon { font-size: 0.62rem; color: var(--ink-soft); }
 .buoy-card-station {
   font-size: 0.68rem;
   color: var(--ink-soft);
@@ -1297,7 +1683,6 @@ a, button {
   color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  opacity: 0.7;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1307,15 +1692,30 @@ a, button {
    safety context: fresh (within a normal hourly update cycle) is
    green, overdue-but-same-day is amber, and anything older than 24
    hours is red — that's the case where a visitor might unknowingly
-   be looking at last week's or last month's conditions. */
+   be looking at last week's or last month's conditions.
+   Colors below are darkened enough to clear 4.5:1 (plus a small
+   safety margin, ~4.65:1+) at this text's actual size (10.24px, from
+   the 0.64rem parent — nowhere near WCAG's "large text" threshold, so
+   the full 4.5:1 minimum applies, not the relaxed 3:1 for large
+   text), against .buoy-card's REAL background, --paper (#F6F8F9) —
+   not white. That correction matters: an earlier pass here computed
+   against white by mistake (an assumption that was never actually
+   checked against the card's own CSS) and landed at 4.23–4.30:1,
+   which still failed — paper is only marginally darker than white,
+   but marginal is exactly what was needed to tip these specific
+   colors under the line. The original #2a9d5c/#d97706 measured
+   3.46:1/3.19:1 on white on their own — already failing — and the
+   .buoy-card-source-used opacity:0.7 removed above was compounding
+   that further, dragging the *rendered* contrast down to
+   2.32:1/2.22:1 once actually composited. */
 .buoy-age {
   font-weight: 600;
   font-style: normal;
   letter-spacing: 0;
 }
-.buoy-age--fresh  { color: #2a9d5c; } /* green  — under 2 hours   */
-.buoy-age--stale  { color: #d97706; } /* amber  — 2–24 hours      */
-.buoy-age--old    { color: #dc2626; } /* red    — over 24 hours   */
+.buoy-age--fresh  { color: #227f4a; } /* 4.68:1 vs the card's real --paper background */
+.buoy-age--stale  { color: #a85c04; } /* 4.68:1 vs the card's real --paper background */
+.buoy-age--old    { color: #d92323; } /* 4.65:1 vs the card's real --paper background — was #dc2626, only 4.53:1, right at the edge */
 .buoy-no-sensor {
   color: var(--ink-soft);
   cursor: help; /* signals the title tooltip is available */
@@ -1350,13 +1750,13 @@ a, button {
     box-shadow 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .weather-card:hover,
-.weather-card:focus-visible {
+.weather-card:focus-within {
   transform: scale(1.04);
   box-shadow:
     0 30px 50px -22px rgba(19, 41, 75, 0.38),
     0 14px 22px -10px rgba(19, 41, 75, 0.16);
 }
-.weather-card:not(:hover):not(:focus-visible) {
+.weather-card:not(:hover):not(:focus-within) {
   transition:
     transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1380,13 +1780,14 @@ a, button {
   opacity: 0.6;
   transition: opacity 0.15s;
 }
-.weather-info-btn:hover,
-.weather-info-btn:focus-visible {
+.weather-info-btn:hover {
   opacity: 1;
   color: var(--teal-deep);
   outline: none;
 }
 .weather-info-btn:focus-visible {
+  opacity: 1;
+  color: var(--teal-deep);
   outline: 2px solid var(--teal-deep);
   border-radius: 2px;
 }
@@ -1476,7 +1877,9 @@ a, button {
   bottom: 16px;
   left: 16px;
   z-index: 9999;
-  display: flex;
+  display: none; /* hidden by default — JS (F1 toggle) reveals it explicitly;
+     previously defaulted to visible here and relied entirely on JS
+     running to hide it on load, which broke if that JS didn't ship */
   flex-direction: column;
   gap: 4px;
   background: rgba(0,0,0,0.75);
@@ -1554,7 +1957,7 @@ a, button {
 .weather-provider { font-size: 0.72rem; color: var(--ink-soft); margin: 0 0 12px 0; }
 .weather-provider a { color: var(--ink-soft); font-weight: 600; text-decoration: none; }
 .weather-provider a:hover { text-decoration: underline; }
-.weather-provider a i { font-size: 0.65rem; margin-left: 2px; }
+.weather-provider a .icon { font-size: 0.65rem; margin-left: 2px; }
 .weather-main { display: flex; align-items: center; gap: 14px; }
 .weather-icon { font-size: 2.6rem; color: var(--teal-deep); }
 .weather-temp { font-family: var(--font-display); font-size: 2.4rem; font-weight: 600; color: var(--navy); line-height: 1; }
@@ -1606,7 +2009,7 @@ a, button {
 .beachguard-head h3 { font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--teal-deep); }
 .beachguard-head h3 a { color: inherit; display: inline-flex; align-items: center; gap: 6px; }
 .beachguard-head h3 a:hover { text-decoration: underline; }
-.beachguard-head h3 a i { font-size: 0.7rem; }
+.beachguard-head h3 a .icon { font-size: 0.7rem; }
 
 .beach-list li {
   display: flex;
@@ -1776,6 +2179,21 @@ a, button {
   background-position: -375.82px 0;
 }
 
+/* footer-partners' two logo slices (375.82 + 16 gap + 251.63 = 643.45px)
+   only wrap to 2 lines once footer-inner's content width (viewport
+   minus its 16px+16px padding) drops below that — i.e. below roughly
+   675px viewport width. This margin (breathing room after the first
+   row, before Purdue's second row starts) only makes visual sense
+   once that wrap has actually happened; at wider widths like 720p
+   (1280px) the strip is still a single row and the extra gap just
+   reads as stray space. Scoped here instead of the much wider 1400px
+   mobile/tablet breakpoint it used to share. */
+@media (max-width: 680px) {
+  .partner-logos-wrap--left {
+    margin-right: 14px;
+  }
+}
+
 /* At narrow iPhone-class widths, the left logo slice (375.82px) plus
    its margin is wider than the entire viewport, guaranteeing overflow
    — confirmed by the math, not just suspicion. Rather than a
@@ -1828,6 +2246,10 @@ a, button {
 }
 
 .footer-contact p { margin: 0; line-height: 1.4; }
+.footer-contact a {
+  color: #BFD4E6;
+  text-decoration: underline;
+}
 
 .footer-disclaimer {
   margin: 0 0 10px 0;
@@ -1869,8 +2291,27 @@ a, button {
    ZOOM / REFLOW SUPPORT (WCAG 1.4.10) — release the 100vh lock
    When the viewport becomes narrow due to 200% zoom, switch to normal
    page scrolling with a stacked single-column layout.
+
+   MOBILE VS DESKTOP — three ways to land in this block, not just one:
+     (max-width: 1333px)  — any device, window too narrow for 3 columns
+     (max-height: 700px)  — any device, window too short to be usable
+     (hover: none) and (pointer: coarse) — touch-primary devices, ANY
+       size — this is what makes an iPad in landscape (1366px wide,
+       often taller than 700px too) still get the mobile treatment
+       even though it would otherwise clear both size floors, while a
+       1366x768 laptop (fine pointer, hover-capable trackpad/mouse —
+       the single most common laptop resolution worldwide) gets to
+       keep the desktop 3-column layout instead. Pointer/hover is the
+       real signal for "is this actually a touch device," since
+       viewport size alone can't tell an iPad landscape apart from a
+       small laptop window — they can be pixel-identical.
+   The two size floors were previously 1400/1067; both came down
+   specifically so common laptop resolutions clear them now that
+   pointer/hover is doing the touch/non-touch split instead. See the
+   .layout grid-template-columns comment further down for the matching
+   column-minimum-width adjustment this required.
 =================================================================== */
-@media (max-width: 1400px), (max-height: 1067px) {
+@media (max-width: 1333px), (max-height: 700px), (hover: none) and (pointer: coarse) {
   .buoy-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1937,15 +2378,22 @@ a, button {
     gap: 4px;
     white-space: nowrap;
   }
-  .nav-toggle i {
+  .nav-toggle .icon {
     font-size: 0.8rem;
+  }
+  /* Filipino's translated labels ("Mga Mapa", "Mga Boya"...) are long
+     enough to make all 4 buttons overflow their row on mobile — drop
+     the icons in that one case to free up horizontal space for the
+     text, rather than shrinking the buttons or breaking to 2 rows. */
+  html.lang-is-filipino .nav-toggle .icon {
+    display: none;
   }
 
   /* Everything below here used to live in its own, much narrower
      (max-width: 560px) breakpoint. That left a broken gap between
-     560px and this 1400px threshold — the stacked single-column
+     560px and this 1333px threshold — the stacked single-column
      layout applied, but none of these mobile-specific refinements
-     did. Merged in here so the ENTIRE 1400px-and-below range behaves
+     did. Merged in here so the ENTIRE mobile range behaves
      identically, consistently like "the mobile site," with no gap. */
   :root {
     --header-padding-top: 12px; /* restores symmetric header padding on
@@ -1988,13 +2436,9 @@ a, button {
   .brand-title {
     font-size: 24px;
   }
-  /* Mobile logo strip adjustments: breathing room after the first row
-     (Illinois/NOAA/Sea Grant) and a small horizontal nudge on the
-     second row (Purdue) so its slice of the source image lines up
-     correctly once the two rows wrap. */
-  .partner-logos-wrap--left {
-    margin-right: 14px;
-  }
+  /* partner-logos-wrap--left's 14px margin now lives in its own
+     narrower breakpoint below (~680px), scoped to where the logo
+     strip actually wraps to 2 lines — see that rule for why. */
   /* No background video at this width — falls back to the solid
      --layout-bg color, which body already has as its background-color. */
   .bg-video {
@@ -2020,8 +2464,8 @@ a, button {
 }
 
 /* Brand/logo treatment within the tablet/mobile range (itself capped
-   at 1400px width, same as the main breakpoint above) splits further
-   by width: tablets (500-1400px) get a wider brand row + larger logo,
+   at 1333px width, same as the main breakpoint above) splits further
+   by width: tablets (500-1333px) get a wider brand row + larger logo,
    confirmed looking good on iPad-class screens; phones (under 500px,
    down to the point mobile/zoom kicks in) keep the smaller, original
    logo size, since stretching the brand row and a 120px logo reads as
@@ -2029,7 +2473,7 @@ a, button {
    separate sibling blocks with explicit compound conditions, rather
    than nesting one @media inside the other — functionally identical,
    but doesn't rely on nested @media support at all. */
-@media (min-width: 500px) and (max-width: 1400px) {
+@media (min-width: 500px) and (max-width: 1333px) {
   .brand {
     width: 100%;
     max-width: calc(100% - 40px); /* matches the language selector's own
@@ -2076,3 +2520,33 @@ a, button {
     display: block;
   }
 }
+
+/* ===================================================================
+   FOCUS RING — CONTEXTUAL COLOR OVERRIDES
+   The default blue (#0B5FFF, set via --focus-ring) is excellent on
+   the white/paper surfaces that make up most of the page (5.1:1 /
+   4.8:1 against white/paper), but measured directly against the two
+   backgrounds below, it falls under WCAG's 3:1 non-text minimum:
+     navy header/footer background (#13294B): 2.83:1
+     sun-colored active nav-toggle (#F2A93B):  2.57:1
+   Rather than compromise the ring color everywhere to fix two
+   specific spots, each gets its own locally-appropriate override —
+   white clears the navy background easily (14.5:1); navy itself
+   clears the sun background easily (7.3:1).
+
+   This block is deliberately placed at the very end of the file:
+   several components (.lang-select:focus-visible,
+   .contrast-toggle:focus-visible, etc.) already set their own
+   full `outline` shorthand at the same specificity as a selector
+   like ".site-header *:focus-visible" — on a tie, CSS resolves by
+   source order, so this has to come after all of them or its
+   outline-color would be silently reset back to blue by whichever
+   of those rules happens to be declared later in the file. */
+.site-header *:focus-visible,
+.site-footer *:focus-visible {
+  outline-color: #FFFFFF;
+}
+.nav-toggle--active:focus-visible {
+  outline-color: var(--navy);
+}
+
