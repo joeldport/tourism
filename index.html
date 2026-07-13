@@ -19,6 +19,32 @@
   }
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ===================================================================
+     RENDER-CRITICAL RESOURCE HINTS — grouped together and placed
+     first, before any SEO/social/JSON-LD metadata below. Browsers'
+     preload scanners discover and start fetching resources roughly in
+     document order as the HTML streams in, so anything ahead of this
+     block is time these requests aren't already in flight yet. The
+     stylesheet specifically used to sit behind ~90 lines of markup
+     that don't affect rendering at all — since it's both the single
+     most render-blocking resource on the page (nothing paints without
+     it) AND what gates discovery of the 6 font weights referenced
+     inside it via @font-face (a real HTML->CSS->font dependency
+     chain), moving it this early shortens more than just its own load
+     time. -->
+<link rel="stylesheet" href="styles.min.css?v=1783706800">
+<link rel="preload" as="image" href="assets/Explore_IL.png" fetchpriority="high"><!-- LCP candidate — the largest above-the-fold element (the Illinois Explore card, also fetchpriority="high" where it's actually used in the body) -->
+<link rel="preload" href="assets/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/plus-jakarta-sans-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<!-- Weather and buoy data both start fetching almost immediately on
+     load, each from its own Worker subdomain — preconnecting gets
+     the DNS/TLS setup for both underway before the fetch calls
+     themselves even fire. -->
+<link rel="preconnect" href="https://southern-lake-michigan-outdoors-weather.joeldport.workers.dev">
+<link rel="preconnect" href="https://southern-lake-michigan-outdoors-buoys.joeldport.workers.dev">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+
 <title>Southern Lake Michigan Outdoors: Beaches, Buoys & Maps</title>
 <meta name="description" content="Live buoy data, beach conditions, and interactive maps for the Southern Lake Michigan shoreline across Illinois and Indiana. Plan your visit in real time.">
 <meta name="robots" content="max-image-preview:large">
@@ -97,22 +123,6 @@
   }
 }
 </script>
-
-<link rel="preload" href="assets/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/plus-jakarta-sans-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-<!-- Weather and buoy data both start fetching almost immediately on
-     load, each from its own Worker subdomain — preconnecting gets
-     the DNS/TLS setup for both underway before the fetch calls
-     themselves even fire. -->
-<link rel="preconnect" href="https://southern-lake-michigan-outdoors-weather.joeldport.workers.dev">
-<link rel="preconnect" href="https://southern-lake-michigan-outdoors-buoys.joeldport.workers.dev">
-<link rel="icon" href="favicon.ico" type="image/x-icon">
-<link rel="stylesheet" href="styles.min.css?v=1783706800">
-<!-- LCP preload — this is the largest above-the-fold image (the
-     Illinois Explore card, already marked fetchpriority="high" where
-     it's used) so starting the fetch here, during <head> parsing,
-     beats waiting for the parser to reach the <img> tag itself. -->
-<link rel="preload" as="image" href="assets/Explore_IL.png" fetchpriority="high">
 </head>
 <body>
 
@@ -132,7 +142,6 @@
 <symbol id="i-chevron-up" viewBox="0 0 448 512"><path d="M201.4 105.4c12.5-12.5 32.8-12.5 45.3 0l192 192c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L224 173.3 54.6 342.6c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l192-192z"/></symbol>
 <symbol id="i-circle-half-stroke" viewBox="0 0 512 512"><path d="M448 256c0-106-86-192-192-192l0 384c106 0 192-86 192-192zM0 256a256 256 0 1 1 512 0 256 256 0 1 1 -512 0z"/></symbol>
 <symbol id="i-circle-info" viewBox="0 0 512 512"><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zM224 160a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm-8 64l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24z"/></symbol>
-<symbol id="i-circle-notch" viewBox="0 0 512 512"><path d="M222.7 32.1c5 16.9-4.6 34.8-21.5 39.8-79.3 23.6-137.1 97.1-137.1 184.1 0 106 86 192 192 192s192-86 192-192c0-86.9-57.8-160.4-137.1-184.1-16.9-5-26.6-22.9-21.5-39.8s22.9-26.6 39.8-21.5C434.9 42.1 512 140 512 256 512 397.4 397.4 512 256 512S0 397.4 0 256c0-116 77.1-213.9 182.9-245.4 16.9-5 34.8 4.6 39.8 21.5z"/></symbol>
 <symbol id="i-circle-question" viewBox="0 0 512 512"><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5l0 3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zM224 368a32 32 0 1 1 64 0 32 32 0 1 1 -64 0z"/></symbol>
 <symbol id="i-cloud" viewBox="0 0 576 512"><path d="M0 336c0 79.5 64.5 144 144 144l304 0c70.7 0 128-57.3 128-128 0-51.6-30.5-96.1-74.5-116.3 6.7-13.1 10.5-28 10.5-43.7 0-53-43-96-96-96-17.7 0-34.2 4.8-48.4 13.1-24.1-45.8-72.2-77.1-127.6-77.1-79.5 0-144 64.5-144 144 0 8 .7 15.9 1.9 23.5-56.9 19.2-97.9 73.1-97.9 136.5z"/></symbol>
 <symbol id="i-cloud-bolt" viewBox="0 0 512 512"><path d="M0 224c0 53 43 96 96 96l38.6 0 124.1-111c12.2-10.9 28-17 44.4-17 44.6 0 76.5 43 63.7 85.7L354.1 320 416 320c53 0 96-43 96-96s-43-96-96-96c-.5 0-1.1 0-1.6 0 1.1-5.2 1.6-10.5 1.6-16 0-44.2-35.8-80-80-80-24.3 0-46.1 10.9-60.8 28-18.7-35.7-56.1-60-99.2-60-61.9 0-112 50.1-112 112 0 7.1 .7 14.1 1.9 20.8-38.3 12.6-65.9 48.7-65.9 91.2zM160.6 400l61.8 0-31.2 104.1c-3.6 11.9 5.3 23.9 17.8 23.9 4.6 0 9-1.7 12.4-4.7L362.5 396.9c3.5-3.1 5.5-7.6 5.5-12.4 0-9.2-7.4-16.6-16.6-16.6l-61.8 0 31.2-104.1c3.6-11.9-5.3-23.9-17.8-23.9-4.6 0-9 1.7-12.4 4.7L149.5 371.1c-3.5 3.1-5.5 7.6-5.5 12.4 0 9.2 7.4 16.6 16.6 16.6z"/></symbol>
@@ -209,10 +218,10 @@
         <p>Southern Lake Michigan Outdoors, the University of Illinois, NOAA, Illinois-Indiana Sea Grant, and Purdue University disclaim all liability for any loss, injury, or damage resulting from its use. <strong>Always check posted beach conditions and official sources before entering the water.</strong></p>
       </div>
       <button type="button" id="consentAgreeBtn" class="consent-agree-btn">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check" xlink:href="#i-check"></use></svg> I understand
+        <svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-check" xlink:href="#i-check"></use></svg> I understand
       </button>
       <p class="consent-storage-note">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-lock" xlink:href="#i-lock"></use></svg>
+        <svg class="icon" aria-hidden="true" focusable="false" width="12" height="16"><use href="#i-lock" xlink:href="#i-lock"></use></svg>
         We use your browser's local storage to remember basic settings, such as whether you've already seen this notice. This information never leaves your device.
       </p>
     </div>
@@ -242,7 +251,7 @@
     </div>
     <div class="header-right">
       <button type="button" id="contrastToggle" class="contrast-toggle notranslate" translate="no" aria-pressed="false" aria-label="Enable high contrast mode">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-circle-half-stroke" xlink:href="#i-circle-half-stroke"></use></svg>
+        <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-circle-half-stroke" xlink:href="#i-circle-half-stroke"></use></svg>
         <span class="contrast-toggle-label">High Contrast</span>
       </button>
       <div class="lang-select-wrap notranslate" translate="no">
@@ -260,24 +269,24 @@
           <option value="en|ko">Korean - 한국어</option>
           <option value="en|ja">Japanese - 日本語</option>
         </select>
-        <svg class="icon lang-select-icon" aria-hidden="true" focusable="false"><use href="#i-chevron-down" xlink:href="#i-chevron-down"></use></svg>
+        <svg class="icon lang-select-icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-chevron-down" xlink:href="#i-chevron-down"></use></svg>
       </div>
       <div id="google_translate_element" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; overflow:hidden;"></div>
       <div class="nav-toggle-group">
         <a class="nav-toggle" href="#resourcesNav" data-nav-target="resourcesNav">
-          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bars" xlink:href="#i-bars"></use></svg>
+          <svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-bars" xlink:href="#i-bars"></use></svg>
           <span>Resources</span>
         </a>
         <a class="nav-toggle" href="#main-content" data-nav-target="main-content">
-          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chart-line" xlink:href="#i-chart-line"></use></svg>
+          <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-chart-line" xlink:href="#i-chart-line"></use></svg>
           <span>Maps</span>
         </a>
         <a class="nav-toggle" href="#buoy-heading" data-nav-target="buoySection">
-          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-water" xlink:href="#i-water"></use></svg>
+          <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-water" xlink:href="#i-water"></use></svg>
           <span>Buoys</span>
         </a>
         <a class="nav-toggle" href="#alertsAside" data-nav-target="alertsAside">
-          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bell" xlink:href="#i-bell"></use></svg>
+          <svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-bell" xlink:href="#i-bell"></use></svg>
           <span>Alerts</span>
         </a>
       </div>
@@ -330,66 +339,66 @@
 
   <!-- LEFT COLUMN: RESOURCES -->
   <nav class="col col-resources" id="resourcesNav" tabindex="-1" aria-label="Resources">
-    <h2 class="col-heading"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-book-open" xlink:href="#i-book-open"></use></svg> Resources</h2>
+    <h2 class="col-heading"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-book-open" xlink:href="#i-book-open"></use></svg> Resources</h2>
 
     <details class="res-group res-group--auto-expand" data-auto-expand-min-width="1401" open>
       <summary class="res-group-summary"><h3 id="heading-boating">Boating</h3></summary>
       <ul>
-        <li><a href="https://dnr.illinois.gov/boating/boatingopportunities.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ship" xlink:href="#i-ship"></use></svg> Illinois Boat Launch Program <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://dnr.illinois.gov/safety/boatingsafety.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Illinois Boating Education Certificate <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://dnr.illinois.gov/cmp/illinoiscleanmarina.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-anchor" xlink:href="#i-anchor"></use></svg> Illinois Clean Marinas <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://experience.arcgis.com/experience/ddedef95863540ebb02fb044aa5a7e38" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-person-swimming" xlink:href="#i-person-swimming"></use></svg> IN DNR Where to Paddle <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/wildlife-resources/public-access-program" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-ship" xlink:href="#i-ship"></use></svg> Indiana Boat Launches <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.boat-ed.com/indiana/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Indiana Boating License <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/idem/lakemichigan/indiana-clean-marinas/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-anchor" xlink:href="#i-anchor"></use></svg> Indiana Clean Marinas <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.illinoispaddle.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-person-swimming" xlink:href="#i-person-swimming"></use></svg> Paddle Illinois <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://surfradar.info/publ/dashboards/lake_michigan/11-1" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-wind" xlink:href="#i-wind"></use></svg> Windsurfing &ndash; Great Lakes Surf Radar <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/boating/boatingopportunities.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="20" height="16"><use href="#i-ship" xlink:href="#i-ship"></use></svg> Illinois Boat Launch Program <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/safety/boatingsafety.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Illinois Boating Education Certificate <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/cmp/illinoiscleanmarina.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-anchor" xlink:href="#i-anchor"></use></svg> Illinois Clean Marinas <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://experience.arcgis.com/experience/ddedef95863540ebb02fb044aa5a7e38" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="20" height="16"><use href="#i-person-swimming" xlink:href="#i-person-swimming"></use></svg> IN DNR Where to Paddle <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/wildlife-resources/public-access-program" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="20" height="16"><use href="#i-ship" xlink:href="#i-ship"></use></svg> Indiana Boat Launches <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.boat-ed.com/indiana/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Indiana Boating License <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/idem/lakemichigan/indiana-clean-marinas/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-anchor" xlink:href="#i-anchor"></use></svg> Indiana Clean Marinas <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.illinoispaddle.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="20" height="16"><use href="#i-person-swimming" xlink:href="#i-person-swimming"></use></svg> Paddle Illinois <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://surfradar.info/publ/dashboards/lake_michigan/11-1" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-wind" xlink:href="#i-wind"></use></svg> Windsurfing &ndash; Great Lakes Surf Radar <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
       </ul>
     </details>
 
     <details class="res-group res-group--auto-expand" data-auto-expand-min-width="1401" open>
       <summary class="res-group-summary"><h3 id="heading-fishing">Fishing</h3></summary>
       <ul>
-        <li><a href="https://fishatlas.org/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-fish" xlink:href="#i-fish"></use></svg> Fish Atlas <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://ifishillinois.org/Waterbodies/LakesAndReservoirs" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-map-location-dot" xlink:href="#i-map-location-dot"></use></svg> Illinois Fishing <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://dnr.illinois.gov/lpr/fishinglicensesfees.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Illinois Fishing License <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/licenses-and-permits/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Indiana Fishing License <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/fishing/where-to-fish-interactive-map" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-map-location-dot" xlink:href="#i-map-location-dot"></use></svg> Indiana Where to Fish <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://fishatlas.org/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-fish" xlink:href="#i-fish"></use></svg> Fish Atlas <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://ifishillinois.org/Waterbodies/LakesAndReservoirs" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="20" height="16"><use href="#i-map-location-dot" xlink:href="#i-map-location-dot"></use></svg> Illinois Fishing <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://dnr.illinois.gov/lpr/fishinglicensesfees.html" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Illinois Fishing License <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/licenses-and-permits/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-id-card" xlink:href="#i-id-card"></use></svg> Indiana Fishing License <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/fish-and-wildlife/fishing/where-to-fish-interactive-map" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="20" height="16"><use href="#i-map-location-dot" xlink:href="#i-map-location-dot"></use></svg> Indiana Where to Fish <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
       </ul>
     </details>
 
     <details class="res-group res-group--auto-expand" data-auto-expand-min-height="1454" data-auto-expand-link-count="6">
       <summary class="res-group-summary"><h3 id="heading-parks">Parks</h3></summary>
       <ul>
-        <li><a href="https://www.chicagoparkdistrict.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Chicago Park District <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.gary.gov/parks/about" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Gary Parks and Recreation <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.gohammond.com/departments/parks-and-recreation/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Hammond Parks and Recreation <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.nps.gov/indu/index.htm" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-mountain" xlink:href="#i-mountain"></use></svg> Indiana Dunes National Park <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/dnr/state-parks/parks-lakes/indiana-dunes-state-park/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-mountain" xlink:href="#i-mountain"></use></svg> Indiana Dunes State Park <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.michigancityin.gov/city-departments/parks-recreation" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Michigan City Parks and Recreation <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.chicagoparkdistrict.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Chicago Park District <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.gary.gov/parks/about" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Gary Parks and Recreation <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.gohammond.com/departments/parks-and-recreation/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Hammond Parks and Recreation <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.nps.gov/indu/index.htm" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-mountain" xlink:href="#i-mountain"></use></svg> Indiana Dunes National Park <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/dnr/state-parks/parks-lakes/indiana-dunes-state-park/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-mountain" xlink:href="#i-mountain"></use></svg> Indiana Dunes State Park <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.michigancityin.gov/city-departments/parks-recreation" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-tree" xlink:href="#i-tree"></use></svg> Michigan City Parks and Recreation <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
       </ul>
     </details>
 
     <details class="res-group res-group--auto-expand" data-auto-expand-min-height="1732" data-auto-expand-link-count="4">
       <summary class="res-group-summary"><h3 id="heading-travel">Travel</h3></summary>
       <ul>
-        <li><a href="https://www.gettingaroundillinois.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-road" xlink:href="#i-road"></use></svg> Illinois Travel Conditions <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/indot/travel-conditions/travel-information/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-road" xlink:href="#i-road"></use></svg> Indiana Travel Conditions <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.in.gov/nirpc/transportation/greenways-and-blueways/greenways-and-blueways-map/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-map" xlink:href="#i-map"></use></svg> NIRPC Greenways &amp; Blueways Map <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://mysouthshoreline.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-train" xlink:href="#i-train"></use></svg> South Shore Line <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.gettingaroundillinois.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-road" xlink:href="#i-road"></use></svg> Illinois Travel Conditions <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/indot/travel-conditions/travel-information/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-road" xlink:href="#i-road"></use></svg> Indiana Travel Conditions <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.in.gov/nirpc/transportation/greenways-and-blueways/greenways-and-blueways-map/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-map" xlink:href="#i-map"></use></svg> NIRPC Greenways &amp; Blueways Map <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://mysouthshoreline.com/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="12" height="16"><use href="#i-train" xlink:href="#i-train"></use></svg> South Shore Line <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
       </ul>
     </details>
 
     <details class="res-group res-group--auto-expand" data-auto-expand-min-height="2160" data-auto-expand-link-count="7">
       <summary class="res-group-summary"><h3 id="heading-water-safety">Water Safety</h3></summary>
       <ul>
-        <li><a href="https://www.facebook.com/groups/1322458709024153/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-facebook" xlink:href="#i-facebook"></use></svg> Blue Flow Great Lakes <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://greatlakeswatersafety.org" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-shield-halved" xlink:href="#i-shield-halved"></use></svg> Great Lakes Water Safety Consortium <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://portal.idem.in.gov/beachalert" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bell" xlink:href="#i-bell"></use></svg> IDEM Beach Alert <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.idph.state.il.us/envhealth/ilbeaches/public/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bell" xlink:href="#i-bell"></use></svg> Illinois Beach Guard <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.lakemichigansafety.org/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-life-ring" xlink:href="#i-life-ring"></use></svg> Lake Michigan Safety <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.facebook.com/profile.php?id=100064506169734" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-facebook" xlink:href="#i-facebook"></use></svg> Lake Michigan Safety (Facebook) <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
-        <li><a href="https://www.weather.gov/greatlakes/beachhazards" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-triangle-exclamation" xlink:href="#i-triangle-exclamation"></use></svg> NWS Great Lakes Beach Hazards <svg class="icon ext-icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.facebook.com/groups/1322458709024153/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-facebook" xlink:href="#i-facebook"></use></svg> Blue Flow Great Lakes <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://greatlakeswatersafety.org" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-shield-halved" xlink:href="#i-shield-halved"></use></svg> Great Lakes Water Safety Consortium <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://portal.idem.in.gov/beachalert" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-bell" xlink:href="#i-bell"></use></svg> IDEM Beach Alert <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.idph.state.il.us/envhealth/ilbeaches/public/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-bell" xlink:href="#i-bell"></use></svg> Illinois Beach Guard <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.lakemichigansafety.org/" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-life-ring" xlink:href="#i-life-ring"></use></svg> Lake Michigan Safety <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.facebook.com/profile.php?id=100064506169734" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-facebook" xlink:href="#i-facebook"></use></svg> Lake Michigan Safety (Facebook) <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
+        <li><a href="https://www.weather.gov/greatlakes/beachhazards" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-triangle-exclamation" xlink:href="#i-triangle-exclamation"></use></svg> NWS Great Lakes Beach Hazards <svg class="icon ext-icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></li>
       </ul>
     </details>
   </nav>
@@ -397,7 +406,7 @@
   <!-- CENTER COLUMN: INTERACTIVE OUTDOOR MAPS -->
   <div class="col col-main-wrapper">
     <main class="col-main" id="main-content" tabindex="-1">
-    <h2 class="col-heading"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-chart-line" xlink:href="#i-chart-line"></use></svg> Interactive Outdoor Maps</h2>
+    <h2 class="col-heading"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-chart-line" xlink:href="#i-chart-line"></use></svg> Interactive Outdoor Maps</h2>
 
     <div class="main-blurb-zone">
       <figure class="main-blurb">
@@ -418,7 +427,7 @@
               <span class="dash-card-title">Explore Illinois</span>
               <span class="dash-card-sub" id="il-card-desc">Interactive map of Illinois' shoreline with beaches, trails, marinas, and more.<span class="sr-only"> (opens in new tab)</span></span>
             </div>
-            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg>
+            <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg>
           </div>
         </div>
       </a>
@@ -431,7 +440,7 @@
               <span class="dash-card-title">Explore Indiana</span>
               <span class="dash-card-sub" id="in-card-desc">Interactive map of Indiana's shoreline with beaches, trails, marinas, and more.<span class="sr-only"> (opens in new tab)</span></span>
             </div>
-            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg>
+            <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg>
           </div>
         </div>
       </a>
@@ -439,32 +448,32 @@
     </main>
 
     <section class="buoy-section" id="buoySection" tabindex="-1" aria-labelledby="buoy-heading">
-      <h2 id="buoy-heading" class="buoy-heading"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-water" xlink:href="#i-water"></use></svg> Lake Michigan Buoys</h2>
+      <h2 id="buoy-heading" class="buoy-heading"><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-water" xlink:href="#i-water"></use></svg> Lake Michigan Buoys</h2>
       <div class="buoy-grid" id="buoyGrid">
         <article class="buoy-card" data-station="45170" data-glos-id="47" data-name="Michigan City Buoy" data-link="https://iiseagrant.org/buoys/michigan-city-buoy/">
-          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/michigan-city-buoy/" target="_blank" rel="noopener">Michigan City <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/michigan-city-buoy/" target="_blank" rel="noopener">Michigan City <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
           <p class="buoy-card-station">Station 45170</p>
-          <div class="buoy-card-data" aria-live="polite"><svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg> Loading&hellip;</div>
+          <div class="buoy-card-data" aria-live="polite"><span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span> Loading&hellip;</div>
         </article>
         <article class="buoy-card" data-station="45198" data-glos-id="98" data-name="Chicago Buoy" data-link="https://iiseagrant.org/buoys/chicago-pier-buoy/">
-          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/chicago-pier-buoy/" target="_blank" rel="noopener">Chicago <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/chicago-pier-buoy/" target="_blank" rel="noopener">Chicago <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
           <p class="buoy-card-station">Station 45198</p>
-          <div class="buoy-card-data" aria-live="polite"><svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg> Loading&hellip;</div>
+          <div class="buoy-card-data" aria-live="polite"><span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span> Loading&hellip;</div>
         </article>
         <article class="buoy-card" data-station="45174" data-glos-id="57" data-name="Wilmette Buoy" data-link="https://iiseagrant.org/buoys/wilmette-buoy/current-data/" data-no-water="Thermistor chain: see site">
-          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/wilmette-buoy/current-data/" target="_blank" rel="noopener">Wilmette <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/buoys/wilmette-buoy/current-data/" target="_blank" rel="noopener">Wilmette <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
           <p class="buoy-card-station">Station 45174</p>
-          <div class="buoy-card-data" aria-live="polite"><svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg> Loading&hellip;</div>
+          <div class="buoy-card-data" aria-live="polite"><span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span> Loading&hellip;</div>
         </article>
         <article class="buoy-card" data-station="45186" data-name="Waukegan Buoy" data-link="https://www.ndbc.noaa.gov/station_page.php?station=45186">
-          <h3 class="buoy-card-title"><a href="https://www.ndbc.noaa.gov/station_page.php?station=45186" target="_blank" rel="noopener">Waukegan <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <h3 class="buoy-card-title"><a href="https://www.ndbc.noaa.gov/station_page.php?station=45186" target="_blank" rel="noopener">Waukegan <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
           <p class="buoy-card-station">NDBC 45186</p>
-          <div class="buoy-card-data" aria-live="polite"><svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg> Loading&hellip;</div>
+          <div class="buoy-card-data" aria-live="polite"><span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span> Loading&hellip;</div>
         </article>
         <article class="buoy-card" data-station="45187" data-name="Winthrop Harbor Buoy" data-link="https://iiseagrant.org/winthrop-harbor-buoy/" data-no-wind="1.5m anemometer: see site">
-          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/winthrop-harbor-buoy/" target="_blank" rel="noopener">Winthrop Harbor <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+          <h3 class="buoy-card-title"><a href="https://iiseagrant.org/winthrop-harbor-buoy/" target="_blank" rel="noopener">Winthrop Harbor <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
           <p class="buoy-card-station">NDBC 45187</p>
-          <div class="buoy-card-data" aria-live="polite"><svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg> Loading&hellip;</div>
+          <div class="buoy-card-data" aria-live="polite"><span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span> Loading&hellip;</div>
         </article>
       </div>
       <p class="buoy-source">Source: <a href="https://glos.org/" target="_blank" rel="noopener">Great Lakes Observing System (GLOS)<span class="sr-only"> (opens in new tab)</span></a> and <a href="https://www.ndbc.noaa.gov/" target="_blank" rel="noopener">NOAA National Data Buoy Center<span class="sr-only"> (opens in new tab)</span></a> &middot; buoys are deployed seasonally (roughly April&ndash;November) and may show no data outside that window<span id="buoyTimestamp"></span></p>
@@ -473,7 +482,7 @@
 
   <!-- RIGHT COLUMN: ALERTS -->
   <aside class="col col-alerts" id="alertsAside" tabindex="-1" aria-label="Alerts and advisories">
-    <h2 class="col-heading"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bell" xlink:href="#i-bell"></use></svg> Alerts &amp; Advisories</h2>
+    <h2 class="col-heading"><svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-bell" xlink:href="#i-bell"></use></svg> Alerts &amp; Advisories</h2>
 
     <!-- Weather card: flippable between Southern Lake Michigan
          (approximate, front) and Local Weather (back). The
@@ -486,17 +495,17 @@
         <!-- FRONT: Southern Lake Michigan (approximate) -->
         <div class="weather-card-face weather-card-face--front">
           <div class="weather-card-face-inner">
-            <h3 id="heading-weather">Lake Michigan Weather <button type="button" class="weather-info-btn" aria-label="About this forecast" aria-describedby="weatherInfoDetail" title="This forecast uses a fixed NWS grid point (41.85°N, 87.65°W) to represent general conditions along the southern Lake Michigan shoreline. Actual conditions at any specific beach may differ due to lake breezes, fog, or local terrain."><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-circle-info" xlink:href="#i-circle-info"></use></svg></button><span id="weatherInfoDetail" class="sr-only">This forecast uses a fixed NWS grid point (41.85°N, 87.65°W) to represent general conditions along the southern Lake Michigan shoreline. Actual conditions at any specific beach may differ due to lake breezes, fog, or local terrain.</span></h3>
-            <p class="weather-provider">Live conditions via <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></p>
+            <h3 id="heading-weather">Lake Michigan Weather <button type="button" class="weather-info-btn" aria-label="About this forecast" aria-describedby="weatherInfoDetail" title="This forecast uses a fixed NWS grid point (41.85°N, 87.65°W) to represent general conditions along the southern Lake Michigan shoreline. Actual conditions at any specific beach may differ due to lake breezes, fog, or local terrain."><svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-circle-info" xlink:href="#i-circle-info"></use></svg></button><span id="weatherInfoDetail" class="sr-only">This forecast uses a fixed NWS grid point (41.85°N, 87.65°W) to represent general conditions along the southern Lake Michigan shoreline. Actual conditions at any specific beach may differ due to lake breezes, fog, or local terrain.</span></h3>
+            <p class="weather-provider">Live conditions via <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></p>
             <div id="weatherContentSlmo" aria-live="polite">
               <p class="weather-status">
-                <svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg>
+                <span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span>
                 Loading conditions for your area&hellip;
               </p>
             </div>
           </div>
           <button type="button" class="weather-card-flip-btn" id="weatherFlipToLocal" aria-label="Show local weather">
-            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-location-dot" xlink:href="#i-location-dot"></use></svg>
+            <svg class="icon" aria-hidden="true" focusable="false" width="12" height="16"><use href="#i-location-dot" xlink:href="#i-location-dot"></use></svg>
             <span>Local</span>
           </button>
         </div>
@@ -504,16 +513,16 @@
         <div class="weather-card-face weather-card-face--back">
           <div class="weather-card-face-inner">
             <h3 id="heading-weather-local">Local Weather</h3>
-            <p class="weather-provider">Live conditions via <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></p>
+            <p class="weather-provider">Live conditions via <a href="https://www.weather.gov/" target="_blank" rel="noopener">National Weather Service <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></p>
             <div id="weatherContentLocal" aria-live="polite">
               <p class="weather-status">
-                <svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg>
+                <span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span>
                 Loading your local conditions&hellip;
               </p>
             </div>
           </div>
           <button type="button" class="weather-card-flip-btn" id="weatherFlipToSlmo" aria-label="Show Southern Lake Michigan weather">
-            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-water" xlink:href="#i-water"></use></svg>
+            <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-water" xlink:href="#i-water"></use></svg>
             <span>Lake</span>
           </button>
         </div>
@@ -522,7 +531,7 @@
 
     <div class="beach-search">
       <label for="beachSearchInput" class="beach-search-label">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-magnifying-glass" xlink:href="#i-magnifying-glass"></use></svg>
+        <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-magnifying-glass" xlink:href="#i-magnifying-glass"></use></svg>
         Search Illinois &amp; Indiana beaches
       </label>
       <input type="search" id="beachSearchInput" class="beach-search-input" placeholder="Find a beach by name&hellip;" autocomplete="off">
@@ -531,11 +540,11 @@
 
     <section class="beachguard-card" aria-labelledby="heading-il-beachguard">
       <div class="beachguard-head">
-        <h3 id="heading-il-beachguard"><a href="https://idph.illinois.gov/envhealth/ilbeaches/public/" target="_blank" rel="noopener">Illinois Beachguard <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+        <h3 id="heading-il-beachguard"><a href="https://idph.illinois.gov/envhealth/ilbeaches/public/" target="_blank" rel="noopener">Illinois Beachguard <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
       </div>
       <ul class="beach-list" id="ilBeachList" aria-live="polite">
         <li class="beach-status-row">
-          <svg class="icon fa-spin" aria-hidden="true" focusable="false"><use href="#i-circle-notch" xlink:href="#i-circle-notch"></use></svg> Checking live advisories&hellip;
+          <span class="wave-loader" aria-hidden="true"><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span><span class="wave-loader-dot"></span></span> Checking live advisories&hellip;
         </li>
       </ul>
       <p class="beach-source">Source: <a href="https://idph.illinois.gov/envhealth/ilbeaches/public/RssFeed.aspx" target="_blank" rel="noopener">IDPH Beach Advisory RSS<span class="sr-only"> (opens in new tab)</span></a><span id="ilFeedTimestamp"></span></p>
@@ -543,7 +552,7 @@
 
     <section class="beachguard-card" aria-labelledby="heading-in-beachguard">
       <div class="beachguard-head">
-        <h3 id="heading-in-beachguard"><a href="https://portal.idem.in.gov/BeachAlert/" target="_blank" rel="noopener">Indiana BeachAlert (IDEM) <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
+        <h3 id="heading-in-beachguard"><a href="https://portal.idem.in.gov/BeachAlert/" target="_blank" rel="noopener">Indiana BeachAlert (IDEM) <svg class="icon" aria-hidden="true" focusable="false" width="16" height="16"><use href="#i-arrow-up-right-from-square" xlink:href="#i-arrow-up-right-from-square"></use></svg><span class="sr-only"> (opens in new tab)</span></a></h3>
       </div>
       <ul class="beach-list" id="inBeachList"></ul>
       <p class="beach-source">IDEM's BeachAlert can't be read. Please <a href="https://portal.idem.in.gov/BeachAlert/" target="_blank" rel="noopener">visit the IDEM portal<span class="sr-only"> (opens in new tab)</span></a>.</p>
@@ -587,20 +596,22 @@
        reasoning as before. -->
   <div class="bg-video-controls" role="group" aria-label="Background ambiance controls">
     <button type="button" id="bgVideoPlayToggle" class="bg-video-btn" aria-pressed="false" aria-label="Play background video">
-      <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-play" xlink:href="#i-play"></use></svg>
+      <svg class="icon" aria-hidden="true" focusable="false" width="14" height="16"><use href="#i-play" xlink:href="#i-play"></use></svg>
     </button>
     <button type="button" id="bgAudioPrevToggle" class="bg-video-btn bg-audio-track-btn" aria-label="Previous ambient track" hidden>
-      <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-backward-step" xlink:href="#i-backward-step"></use></svg>
+      <svg class="icon" aria-hidden="true" focusable="false" width="12" height="16"><use href="#i-backward-step" xlink:href="#i-backward-step"></use></svg>
     </button>
     <button type="button" id="bgAudioNextToggle" class="bg-video-btn bg-audio-track-btn" aria-label="Next ambient track" hidden>
-      <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-forward-step" xlink:href="#i-forward-step"></use></svg>
+      <svg class="icon" aria-hidden="true" focusable="false" width="12" height="16"><use href="#i-forward-step" xlink:href="#i-forward-step"></use></svg>
     </button>
     <button type="button" id="bgAudioToggle" class="bg-video-btn" aria-pressed="false" aria-label="Play ambient audio">
-      <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-volume-xmark" xlink:href="#i-volume-xmark"></use></svg>
+      <svg class="icon" aria-hidden="true" focusable="false" width="18" height="16"><use href="#i-volume-xmark" xlink:href="#i-volume-xmark"></use></svg>
     </button>
     <span id="bgAudioTrackLabel" class="bg-audio-track-label" hidden aria-live="polite"></span>
-    <input type="range" id="bgVolumeSlider" class="bg-volume-slider" min="0" max="100" value="50" step="1"
-      aria-label="Ambient audio volume" hidden>
+    <span id="bgVolumeSliderWrap" class="bg-volume-slider-wrap">
+      <input type="range" id="bgVolumeSlider" class="bg-volume-slider" min="0" max="100" value="50" step="1"
+        aria-label="Ambient audio volume" hidden>
+    </span>
   </div>
 </footer>
 </div>
@@ -614,6 +625,7 @@
      ============================================================ -->
 <div id="devWeatherPanel">
   <div id="devDeadLinksPanel"></div>
+  <div id="devVisitCount"></div>
 </div>
 
 <!-- track_04 is loaded via JS (initAmbientAudio) same as 01-03;
